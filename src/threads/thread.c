@@ -260,7 +260,7 @@ thread_sleep (int64_t ticks)
   if(cur != idle_thread){
 
     cur->wakeup_tick = ticks;
-    list_push_back (&sleep_list, &cur->elem);////////////////////////////////////////////////////////////////////////////////////
+    list_push_back (&sleep_list, &cur->elem);
     /*update the ticks value for awake function to be performed*/
     update_next_tick_to_wake(ticks);
     thread_block();

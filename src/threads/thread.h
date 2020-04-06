@@ -24,6 +24,11 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* 17.14 format properties. */
+typedef int num_17_14;
+#define ONE_17_14 ((num_17_14) 1 << 14);
+
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -101,6 +106,11 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    /* Defined due to BSD Scheduler. */
+    int nice;                           /* Nice value of thread. */
+    int recent_cpu;                     /* Usage of cpu in recent.  */  
+
   };
 
 /* If false (default), use round-robin scheduler.
