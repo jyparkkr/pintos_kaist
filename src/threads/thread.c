@@ -28,6 +28,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of processes in THREAD_BLOCKED state, that is, processes
+   that are bloced after the sleep() call *****************************************************************************I modified */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -49,6 +53,8 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
+  /* minimum value of wakeup ticks of the threads int the sleep list. *////////////////////////////////////////////////////////
+static int64_t next_tick_to_wake = INT64_MAX;
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -84,6 +90,16 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+void update_next_tick_to_wake(int64_t ticks)
+{
+  if(ticks<next_tick_to_wake)
+      next_tick_to_wake = ticks;
+}
+int64_t get_next_tick_to_wake(void)
+{
+  return next_tick_to_wake;
+}
+
 void
 thread_init (void) 
 {
@@ -92,6 +108,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -208,6 +225,11 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  /* compare the priorities of the currently running thread and the newly inserted one. Yield the CPU if the newly arriving thread has higher priority*/
+  struct thread *cur_t = thread_current();
+  if(cur_t->priority < t->priority){
+    thread_yield();
+  }
 
   return tid;
 }
@@ -228,6 +250,23 @@ thread_block (void)
   schedule ();
 }
 
+void
+thread_sleep (int64_t ticks) 
+{
+  enum intr_level old_level;
+  struct thread *cur = thread_current ();
+
+  old_level = intr_disable ();
+  if(cur != idle_thread){
+
+    cur->wakeup_tick = ticks;
+    list_push_back (&sleep_list, &cur->elem);////////////////////////////////////////////////////////////////////////////////////
+    /*update the ticks value for awake function to be performed*/
+    update_next_tick_to_wake(ticks);
+    thread_block();
+  }
+  intr_set_level (old_level);
+}
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -245,9 +284,29 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t-> elem, cmp_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+void
+thread_awake (int64_t ticks) 
+{
+  struct list_elem* ent;
+
+  next_tick_to_wake = INT64_MAX;
+  ent = list_begin (&sleep_list);
+  while (ent != list_end (&sleep_list)){
+    struct thread *t= list_entry (ent, struct thread, elem);
+    ent = list_next (ent);
+    if (t->wakeup_tick <= ticks){
+      list_remove (&t->elem);
+      thread_unblock(t);
+    }
+    else{
+      update_next_tick_to_wake(t->wakeup_tick);
+    }
+  }
 }
 
 /* Returns the name of the running thread. */
@@ -316,7 +375,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur-> elem,cmp_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -344,6 +403,7 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -351,6 +411,25 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
+}
+
+void test_max_priority (void){
+  if (!list_empty (&ready_list)){
+    struct list_elem *e;
+    e=list_begin(&ready_list);
+    struct thread *t = list_entry(e, struct thread, elem);
+    if(thread_get_priority()<t->priority){
+      thread_yield();
+    }
+  }
+}
+
+bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux UNUSED){
+  struct thread *t_a = list_entry(a, struct thread, elem);
+  struct thread *t_b = list_entry(b, struct thread, elem);
+  if (t_a->priority > t_b->priority)
+    return 1;
+  return 0;
 }
 
 /* Sets the current thread's nice value to NICE. */
