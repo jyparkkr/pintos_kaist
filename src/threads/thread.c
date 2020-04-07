@@ -65,7 +65,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
-/* For mlfq  */
+/* For mlfqs  */
 static int ready_threads;
 static num_17_14 decay;
 static num_17_14 load_avg;
@@ -448,14 +448,14 @@ void
 mlfqs_priority (struct thread *t)
 {
   /* Not yet implemented. --> Implemented */
-  ASSERT (t != idle_thread);
+  if(t != idle_thread){
+    int priority= t->priority;
+    int nice = t->nice; 
+    num_17_14 recent_cpu = t->recent_cpu;
 
-  int priority= t->priority;
-  int nice = t->nice; 
-  num_17_14 recent_cpu = t->recent_cpu;
-
-  priority = PRI_MAX - (recent_cpu / 4 / ONE_17_14) - (nice  * 2);
-  t->priority = priority;
+    priority = PRI_MAX - (recent_cpu / 4 / ONE_17_14) - (nice  * 2);
+    t->priority = priority;
+  }
 }
 
 /* Calculate recent_cpu every sec. */
@@ -464,14 +464,14 @@ void
 mlfqs_recent_cpu (struct thread *t)
 {
   /* Not yet implemented. --> Implemented */
-  ASSERT (t != idle_thread);
+  if(t != idle_thread){
+    num_17_14 recent_cpu = t->recent_cpu;
+    int nice = t->nice; 
 
-  num_17_14 recent_cpu = t->recent_cpu;
-  int nice = t->nice; 
-
-  decay = (2 * load_avg) / (2 * load_avg + 1);
-  recent_cpu = ((int64_t) recent_cpu) * decay / ONE_17_14 + nice * ONE_17_14;
-  t->recent_cpu = recent_cpu;
+    decay = (2 * load_avg) / (2 * load_avg + 1);
+    recent_cpu = ((int64_t) recent_cpu) * decay / ONE_17_14 + nice * ONE_17_14;
+    t->recent_cpu = recent_cpu;
+  }
 }
 
 /* Calculate load_avg every sec. */
@@ -479,8 +479,20 @@ void
 mlfqs_load_avg (void)
 {
   /* Not yet implemented. --> Implemented */
+  struct list_elem *e;
+  int ready_thread_num = 0;
+  for (e = list_begin (&ready_list); e != list_end (&ready_list);
+       e = list_next (e))
+    {
+      ready_thread_num++;
+    }
+  if (thread_current () != idle_thread)
+    ready_thread_num++;
+
+  ready_threads = ready_thread_num;
   load_avg = load_avg * 59 / 60 + ready_threads * ONE_17_14 / 60;
-  ASSERT (load_avg < 0);
+  //printf("0x%x\n", load_avg);
+  ASSERT (load_avg >= 0);
 }
 
 /* Increase recent_cpu by 1 by every timer interrupt. */
@@ -488,8 +500,8 @@ void
 mlfqs_increment (void)
 {
   /* Not yet implemented. --> Implemented */
-  ASSERT (thread_current () != idle_thread);
-  thread_current ()->recent_cpu += 1;
+  if (thread_current () != idle_thread)
+    thread_current ()->recent_cpu += 1;
 }
 
 /* Recaculate priority and recent_cpu for all threads. */
