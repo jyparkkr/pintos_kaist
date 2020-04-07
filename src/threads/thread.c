@@ -109,7 +109,6 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&sleep_list);
-
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -201,6 +200,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -260,7 +260,7 @@ thread_sleep (int64_t ticks)
   if(cur != idle_thread){
 
     cur->wakeup_tick = ticks;
-    list_push_back (&sleep_list, &cur->elem);
+    list_push_back (&sleep_list, &cur->elem);////////////////////////////////////////////////////////////////////////////////////
     /*update the ticks value for awake function to be performed*/
     update_next_tick_to_wake(ticks);
     thread_block();
@@ -403,6 +403,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  thread_current ()->init_priority = new_priority;
+  refresh_priority();
   test_max_priority();
 }
 
@@ -430,6 +432,51 @@ bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux
   if (t_a->priority > t_b->priority)
     return 1;
   return 0;
+}
+
+void donate_priority(void)
+{
+  struct thread *cur = thread_current();
+  int nested_depth_counter = 0;
+  int donating_priority;
+
+  while(cur->wait_on_lock){
+    nested_depth_counter++;
+    ASSERT(nested_depth_counter<=8);
+    donating_priority = cur->priority;
+    cur = cur->wait_on_lock->holder; /*there should be holder*/
+    if(cur->priority < donating_priority)
+      cur->priority = donating_priority;
+  }
+}
+
+void remove_with_lock(struct lock *lock)
+{
+  struct list_elem* ent;
+  struct thread *cur = thread_current();
+  ent = list_begin (&cur->donations);
+  while (ent != list_end (&cur->donations)){
+    struct thread *t= list_entry (ent, struct thread, donation_elem);
+    ent = list_next (ent);
+    if (t->wait_on_lock == lock){
+      list_remove (&t->donation_elem);
+    }
+  }
+}
+
+void refresh_priority(void)
+{
+  struct list_elem* ent;
+  struct thread *cur = thread_current();
+  cur->priority = cur->init_priority;
+  ent = list_begin (&cur->donations);
+  while (ent != list_end (&cur->donations)){
+    struct thread *t= list_entry (ent, struct thread, donation_elem);
+    if (cur->priority < t->priority){
+      cur->priority = t->priority;
+    }
+    ent = list_next (ent);
+  }
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -549,6 +596,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  list_init(&t->donations);
+  //lock_init(t->wait_on_lock);
+  t->init_priority = priority;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
