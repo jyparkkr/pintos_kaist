@@ -110,8 +110,14 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    
+    /*these are for priority donation*/
+    int init_priority;
+    struct lock *wait_on_lock;
+    struct list donations;
+    struct list_elem donation_elem;
 
-    /* Defined due to BSD Scheduler. */
+    /* Defined due to mlfqs. */
     int nice;                           /* Nice value of thread. */
     num_17_14 recent_cpu;               /* Usage of cpu in recent.  */  
 
@@ -155,6 +161,12 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 void test_max_priority (void);
 bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux UNUSED);
+
+/* Priority */
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+
 
 /* For BSD */
 void mlfqs_priority (struct thread *t);

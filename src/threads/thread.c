@@ -411,6 +411,8 @@ thread_set_priority (int new_priority)
 {
   if (!thread_mlfqs){
     thread_current ()->priority = new_priority;
+    thread_current ()->init_priority = new_priority;
+    refresh_priority();
     test_max_priority();
   }
 }
@@ -441,6 +443,54 @@ bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux
     return 1;
   return 0;
 }
+
+void donate_priority(void)
+{
+  struct thread *cur = thread_current();
+  int nested_depth_counter = 0;
+  int donating_priority;
+
+  while(cur->wait_on_lock){
+    nested_depth_counter++;
+    ASSERT(nested_depth_counter<=8);
+    donating_priority = cur->priority;
+    cur = cur->wait_on_lock->holder; /*there should be holder*/
+    if(cur->priority < donating_priority)
+      cur->priority = donating_priority;
+  }
+}
+
+void remove_with_lock(struct lock *lock)
+{
+  struct list_elem* ent;
+  struct thread *cur = thread_current();
+  ent = list_begin (&cur->donations);
+  while (ent != list_end (&cur->donations)){
+    struct thread *t= list_entry (ent, struct thread, donation_elem);
+    ent = list_next (ent);
+    if (t->wait_on_lock == lock){
+      list_remove (&t->donation_elem);
+    }
+  }
+}
+
+void refresh_priority(void)
+{
+  struct list_elem* ent;
+  struct thread *cur = thread_current();
+  cur->priority = cur->init_priority;
+  ent = list_begin (&cur->donations);
+  while (ent != list_end (&cur->donations)){
+    struct thread *t= list_entry (ent, struct thread, donation_elem);
+    if (cur->priority < t->priority){
+      cur->priority = t->priority;
+    }
+    ent = list_next (ent);
+  }
+}
+
+
+
 
 /* Implementation for BSD */
 /* Calculate priority using recent_cpu and nice on every 4th tick */
@@ -693,6 +743,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = NICE_DEFAULT;
   t->recent_cpu = RECENT_CPU_DEFAULT;
   list_push_back (&all_list, &t->allelem);
+
+  list_init(&t->donations);
+  //lock_init(t->wait_on_lock);
+  t->init_priority = priority;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
