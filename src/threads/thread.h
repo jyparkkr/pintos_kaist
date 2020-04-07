@@ -24,9 +24,13 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define NICE_DEFAULT 0
+#define RECENT_CPU_DEFAULT 0
+#define LOAD_AVG_DEFAULT 0
+
 /* 17.14 format properties. */
 typedef int num_17_14;
-#define ONE_17_14 ((num_17_14) 1 << 14);
+#define ONE_17_14 ((num_17_14) 1 << 14)
 
 
 /* A kernel thread or user process.
@@ -106,11 +110,16 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    
+    /*these are for priority donation*/
+    int init_priority;                 /*  */
+    struct lock *wait_on_lock;         /*  */
+    struct list donations;             /*  */
+    struct list_elem donation_elem;    /*  */
 
-    /* Defined due to BSD Scheduler. */
+    /* Defined due to mlfqs. */
     int nice;                           /* Nice value of thread. */
-    int recent_cpu;                     /* Usage of cpu in recent.  */  
-
+    num_17_14 recent_cpu;               /* Usage of cpu in recent.  */  
   };
 
 /* If false (default), use round-robin scheduler.
@@ -150,6 +159,19 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 void test_max_priority (void);
 bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux UNUSED);
+
+/* Priority */
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+
+
+/* For BSD */
+void mlfqs_priority (struct thread *t);
+void mlfqs_recent_cpu (struct thread *t);
+void mlfqs_load_avg (void);
+void mlfqs_increment (void);
+void mlfqs_recalc (void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

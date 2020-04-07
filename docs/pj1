@@ -1,0 +1,90 @@
++-------------------------+
+|          EE 415         |
+|         PROJECT 1       |
+|      DESIGN DOCUMENT    |
++-------------------------+
+
+---- GROUP ----
+
+20170088 김문성 ms721@kaist.ac.kr
+20170276 박재영 jypark_korea@kaist.ac.kr
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for
+>> the TAs, or extra credit, please give them here.
+
+No comments
+
+>> Please cite any oﬄine or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation,
+>> course text, and lecture notes.
+
+Lecture note of Pintos Project Slide Set in https://oslab.kaist.ac.kr/ee415-spring-2020/.
+
+ALARM CLOCK
+==========
+
+---- DATA STRUCTURES ----
+
+>> Copy here the declaration of each new or changed ‘struct’ or ‘struct’
+>> member, global or static variable, ‘typedef’, or enumeration.
+>> Identify the purpose of each in 25 words or less.
+
+In "thread", below variables are added.
+
+    /*these are for priority donation*/
+    int init_priority;
+    struct lock *wait_on_lock;
+    struct list donations;
+    struct list_elem donation_elem;
+
+    /* Defined due to mlfqs. */
+    int nice;                           /* Nice value of thread. */
+    num_17_14 recent_cpu;               /* Usage of cpu in recent.  */  
+
+For 17.14 Format, below definition are added.
+
+/* 17.14 format properties. */
+typedef int num_17_14;
+#define ONE_17_14 ((num_17_14) 1 << 14)
+
+For datatype num_17_14, appropriate calulation was applied.
+
+Added global variable
+
+In thread.c, the variable below are added due to mlfqs operation.
+
+/* For mlfqs  */
+static int ready_threads;       /* # of ready threads + current threads */
+static num_17_14 decay;         /* decay for reduce recent_cpu in thread. */
+static num_17_14 load_avg;      /* average load on cpu due to ready thread. */
+
+
+---- ALGORITHMS ----
+
+>> Brieﬂy describe your implementation of 17.14 fixed-point number representation
+Pintos kernel doesn't support floating point calculation. When kernel needs calculation of rational value, representation for fraction is mendatory.
+17.14 fixed point number representation treats rightmost 14 bits as decimal, next 17 bits for integer and leftmost bit for sign.
+For appropriate calculation with other integer value which is defined as 'int', I declare new datatype num_17_14 and its fixed point ONE_17_14.
+
+---- SYNCHRONIZATION ----
+
+>> How do you ensure mlfqs and priority donation code doesn't affect on each other
+By 'if' state and bool value thread_mlfqs, the code control between round-robin scheduler or multi-level feedback queue scheduler.
+It is controlled by kernel command option '-mlfqs'.
+
+---- RATIONALE ----
+
+>> Critique your design, pointing out advantages and disadvantages in
+>> your design choices.
+
+Change of design of timer is more efficient than initial Pintos source code files.
+It checks every ticks whether to wake up or not. Change this to sleep & wake up algorithm makes usage of cpu efficient.
+
+*** about priority scheduling and donation
+
+Multi-level Feedback Queue Scheduler (mlfqs) is 4.4 BSD-like scheduller.
+It gives priority to the process with interactive nature of cpu and other threads.
+This execute process by its priority and priority is calculated by equation.
+This let the system can execute threads by considering various needs.
