@@ -511,7 +511,6 @@ mlfqs_priority (struct thread *t)
 }
 
 /* Calculate recent_cpu every sec. */
-
 void
 mlfqs_recent_cpu (struct thread *t)
 {
