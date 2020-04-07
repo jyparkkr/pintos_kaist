@@ -468,8 +468,9 @@ mlfqs_recent_cpu (struct thread *t)
     num_17_14 recent_cpu = t->recent_cpu;
     int nice = t->nice; 
 
-    decay = (2 * load_avg) / (2 * load_avg + 1);
+    decay = ((int64_t) (2 * load_avg) * ONE_17_14) / (2 * load_avg + ONE_17_14);
     recent_cpu = ((int64_t) recent_cpu) * decay / ONE_17_14 + nice * ONE_17_14;
+    //printf("load_avg: 0x%x, decay:0x%x, recent_cpu:0x%x\n", load_avg, decay, thread_get_recent_cpu());
     t->recent_cpu = recent_cpu;
   }
 }
@@ -483,9 +484,8 @@ mlfqs_load_avg (void)
   int ready_thread_num = 0;
   for (e = list_begin (&ready_list); e != list_end (&ready_list);
        e = list_next (e))
-    {
-      ready_thread_num++;
-    }
+    ready_thread_num++;
+    
   if (thread_current () != idle_thread)
     ready_thread_num++;
 
@@ -500,8 +500,13 @@ void
 mlfqs_increment (void)
 {
   /* Not yet implemented. --> Implemented */
-  if (thread_current () != idle_thread)
-    thread_current ()->recent_cpu += 1;
+  num_17_14 recent_cpu;
+  if (thread_current () != idle_thread){
+    recent_cpu = thread_current ()->recent_cpu;
+    recent_cpu += ONE_17_14;
+    //printf("recent:0x%x\n", recent_cpu);
+    thread_current ()->recent_cpu = recent_cpu;
+  }
 }
 
 /* Recaculate priority and recent_cpu for all threads. */
@@ -593,7 +598,7 @@ thread_get_recent_cpu (void)
 
   old_level = intr_disable ();
   recent_cpu = thread_current ()->recent_cpu;
-  recent_cpu_p = (recent_cpu * 100 + ONE_17_14 / 2) / ONE_17_14;
+  recent_cpu_p = (int) ((recent_cpu * 100 + ONE_17_14 / 2) / ONE_17_14);
   intr_set_level (old_level);
 
   return recent_cpu_p;
