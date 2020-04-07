@@ -24,11 +24,6 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-/* 17.14 format properties. */
-typedef int num_17_14;
-#define ONE_17_14 ((num_17_14) 1 << 14);
-
-
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -96,6 +91,12 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t wakeup_tick;                 /* tick till wake up. */
 
+/*these are for priority donation*/
+    int init_priority;
+    struct lock *wait_on_lock;
+    struct list donations;
+    struct list_elem donation_elem;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -106,11 +107,6 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-
-    /* Defined due to BSD Scheduler. */
-    int nice;                           /* Nice value of thread. */
-    int recent_cpu;                     /* Usage of cpu in recent.  */  
-
   };
 
 /* If false (default), use round-robin scheduler.
@@ -150,6 +146,10 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 void test_max_priority (void);
 bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux UNUSED);
+
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
