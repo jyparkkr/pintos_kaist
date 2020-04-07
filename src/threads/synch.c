@@ -37,8 +37,8 @@
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
 
-//static struct semaphore_elem;
 
+/*initializes sema*/
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -115,7 +115,8 @@ sema_up (struct semaphore *sema)
       list_pop_front (&sema->waiters), struct thread, elem));
   }
   sema->value++;
-  /* priority preemption 코드 추가*/
+
+  /* code for priority preemption*/
   test_max_priority();
   intr_set_level (old_level);
 }
@@ -295,6 +296,10 @@ cond_init (struct condition *cond)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
+
+/*compare the highest priority thread of first semaphore and
+the highest priority thread of second semaphore*/
 bool cmp_cond_priority (const struct list_elem *a, \
   const struct list_elem *b, void *aux UNUSED)
 {
@@ -309,6 +314,7 @@ bool cmp_cond_priority (const struct list_elem *a, \
     return 1;
   return 0;
 }
+
 void
 cond_wait (struct condition *cond, struct lock *lock) 
 {
@@ -320,6 +326,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
+  /*modified to consider priority*/
   list_insert_ordered(&cond->waiters, &waiter.elem, &cmp_cond_priority, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);

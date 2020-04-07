@@ -97,8 +97,8 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
-    int64_t wakeup_tick;                 /* tick till wake up. */
+    struct list_elem allelem;           /* List element for all threads list*/
+    int64_t wakeup_tick;                /* tick for thread to wake up. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -112,10 +112,10 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
     
     /*these are for priority donation*/
-    int init_priority;                 /*  */
-    struct lock *wait_on_lock;         /*  */
-    struct list donations;             /*  */
-    struct list_elem donation_elem;    /*  */
+    int init_priority;               /* To initialize after donation */
+    struct lock *wait_on_lock;       /* lock that current thread wait on*/
+    struct list donations;           /* list of donators.*/
+    struct list_elem donation_elem;  /* list element of list donations */
 
     /* Defined due to mlfqs. */
     int nice;                           /* Nice value of thread. */
@@ -158,7 +158,8 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 void test_max_priority (void);
-bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux UNUSED);
+bool cmp_priority \
+(const struct list_elem *a,const struct list_elem *b,void *aux UNUSED);
 
 /* Priority */
 void donate_priority(void);

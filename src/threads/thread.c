@@ -29,7 +29,7 @@ static struct list ready_list;
 static struct list all_list;
 
 /* List of processes in THREAD_BLOCKED state, that is, processes
-   that are bloced after the sleep() call *****************************************************************************I modified */
+   that are blocked after the sleep() call  */
 static struct list sleep_list;
 
 /* Idle thread. */
@@ -53,7 +53,8 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-/* minimum value of wakeup ticks of the threads int the sleep list. */
+
+/* minimum wakeup_tick value of the threads in the sleep_list. */
 static int64_t next_tick_to_wake = INT64_MAX;
 
 /* Scheduling. */
@@ -95,11 +96,17 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+
+/*if ticks is smaller than next_tick_to_wake,
+update next_tick_to_wake value*/
 void update_next_tick_to_wake(int64_t ticks)
 {
   if(ticks<next_tick_to_wake)
       next_tick_to_wake = ticks;
 }
+
+/*return the next_tick_to_wake value*/
 int64_t get_next_tick_to_wake(void)
 {
   return next_tick_to_wake;
@@ -230,6 +237,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  
   /* compare the priorities of the currently running thread 
      and the newly inserted one. Yield the CPU if the newly 
      arriving thread has higher priority*/
@@ -257,6 +265,9 @@ thread_block (void)
   schedule ();
 }
 
+/*push current thread into sleep_list
+and update to get the next tick to wake up the threads
+then call thread_block*/
 void
 thread_sleep (int64_t ticks) 
 {
@@ -291,11 +302,15 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
+
+  /*insert to ready list in order of priority*/
   list_insert_ordered(&ready_list, &t-> elem, cmp_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
-
+/*look through the sleep_list and awake the threads
+  which has bigger wakeup_tick value than the current tick
+  and also update the next tick to wakeup the thread value*/
 void
 thread_awake (int64_t ticks) 
 {
@@ -381,6 +396,8 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
+
+  /*when inserted to ready list, it follows priority order*/
   if (cur != idle_thread) 
     list_insert_ordered(&ready_list, &cur-> elem, cmp_priority, NULL);
   cur->status = THREAD_READY;
@@ -412,6 +429,8 @@ thread_set_priority (int new_priority)
   if (!thread_mlfqs){
     thread_current ()->priority = new_priority;
     thread_current ()->init_priority = new_priority;
+    
+    /*considering priority donation*/
     refresh_priority();
     test_max_priority();
   }
@@ -424,6 +443,9 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
+/*compare the priority between current running thread
+ and the highest priority except current thread
+ If current thread has smaller priority, current thread yield*/
 void test_max_priority (void){
   if (!list_empty (&ready_list)){
     struct list_elem *e;
@@ -446,22 +468,27 @@ bool cmp_priority (const struct list_elem *a,\
   return 0;
 }
 
+/*priority donation take place*/
 void donate_priority(void)
 {
   struct thread *cur = thread_current();
   int nested_depth_counter = 0;
   int donating_priority;
 
+  /*donate priority to every nested threads*/
   while(cur->wait_on_lock){
     nested_depth_counter++;
+    /*nested depth is limited to 8*/
     ASSERT(nested_depth_counter<=8);
     donating_priority = cur->priority;
-    cur = cur->wait_on_lock->holder; /*there should be holder*/
+    cur = cur->wait_on_lock->holder; /*there must exist holder*/
     if(cur->priority < donating_priority)
       cur->priority = donating_priority;
   }
 }
 
+/*when you release lock,
+find and Remove every entries in the donations list*/
 void remove_with_lock(struct lock *lock)
 {
   struct list_elem* ent;
@@ -476,6 +503,8 @@ void remove_with_lock(struct lock *lock)
   }
 }
 
+/*when thread priority changed, 
+decide current thread's priority againconsider donation*/
 void refresh_priority(void)
 {
   struct list_elem* ent;
@@ -741,13 +770,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
   /* mlfq */
   t->nice = NICE_DEFAULT;
   t->recent_cpu = RECENT_CPU_DEFAULT;
   list_push_back (&all_list, &t->allelem);
 
+  /*priority donation*/
   list_init(&t->donations);
-  //lock_init(t->wait_on_lock);
   t->init_priority = priority;
 }
 

@@ -22,28 +22,145 @@ No comments
 
 Lecture note of Pintos Project Slide Set in https://oslab.kaist.ac.kr/ee415-spring-2020/.
 
+
 ALARM CLOCK
 ==========
 
+
 ---- DATA STRUCTURES ----
 
->> Copy here the declaration of each new or changed ‘struct’ or ‘struct’
->> member, global or static variable, ‘typedef’, or enumeration.
->> Identify the purpose of each in 25 words or less.
 
-In "thread", below variables are added.
+>>new or changes 'struct'
+
+struct thread in pintos/src/threads/thread.h,
+below variables are added.
+    
+    /*these are for alarm clock*/
+    int64_t wakeup_tick;               /* tick for following thread to wake up. */
+
+
+>>Added global variable
+
+In pintos/src/threads/thread.c, the variable below are added for alarm clock.
+
+static struct list sleep_list;   /* List of processes in THREAD_BLOCKED state */
+static int64_t next_tick_to_wake /* Minimum wakeup_tick value of threads in sleep_list
+
+
+---- ALGORITHMS ----
+
+
+>> Brieﬂy describe your implementation of alarm clock
+
+Here we made an alarm clock based on sleep / wake up.
+When timer_sleep(int64_t ticks) called, block and push the thread to sleep_list 
+and run other thread by schedule()
+when current tick is became same or bigger than the next_tick_to_wake value,
+go through every entries in the sleep_list and wake up the thread which has smaller wakeup_tick
+than current tick.
+
+
+---- RATIONALE ----
+
+every test passed related to alarm clock.
+
+Change of design of timer is more efficient than initial Pintos source code files.
+It checks every ticks whether to wake up or not. Change this to sleep & wake up algorithm makes usage of cpu efficient.
+
+
+
+PRIORITY SCHEDULING AND SYNCHRONIZATION
+=======================================
+
+
+---- DATA STRUCTURES ----
+
+
+No specific data structure added or modified for priority scheduling and synchronization
+
+
+---- ALGORITHMS ----
+
+
+>> Brieﬂy describe your implementation of priority scheduling.
+
+When thread is inserted to ready_list or sleep_list, it follows the priority order.
+Also if there comes any changes on priority of thread, it schedules the highest priority thread.
+
+
+>> Brieﬂy describe your implementation of synchronization.
+
+When there happens any changes in waiters list of semaphore or waiters list of condition variable, consider the priority.
+
+
+---- SYNCHRONIZATION ----
+
+
+Here we synchronized semaphore, lock, condition variables with threads by there priority.
+
+
+---- RATIONALE ----
+
+Every test passed
+
+
+
+PRIORITY DONATION
+=================
+
+
+---- DATA STRUCTURES ----
+
+
+>>new or changed 'struct'
+
+struct thread in pintos/src/threads/thread.h,
+below variables are added.
 
     /*these are for priority donation*/
-    int init_priority;
-    struct lock *wait_on_lock;
-    struct list donations;
-    struct list_elem donation_elem;
+    int init_priority;                 /* initial priority for initializing after donation */
+    struct lock *wait_on_lock;         /* lock of which current thread is waiting for */
+    struct list donations;             /* list of donators. Here to consider multople donation*/
+    struct list_elem donation_elem;    /* list element of list donations */
 
-    /* Defined due to mlfqs. */
+
+---- ALGORITHMS ----
+
+
+>> Brieﬂy describe your implementation of priority donation.
+
+When a thread request lock but there already is a lock holder, if lock holder's priority is lower than requested thread's requested thread donate its priority.
+When donation priority, donate to every thread coming out, following the waiting lock, that lock holders waiting lock, thaat lock holders waiting lock recursively until no more waiting lock come out.
+
+When release a lock, remove related entry in the donations list and after that, get its initial priority. Then, look for every entries in the donations list and change the threads priority to the maximum priority value between initial priority and other thread's priority in the donations list.
+
+
+---- RATIONALE ----
+
+
+Every test passed
+
+This algorithm solves the situation which the higher priority thread waits for the lower priority thread to get to lock. Also it can deal with multiple donation and nested donation.
+
+
+MLFQ
+====
+
+
+---- DATA STRUCTURES ----
+
+
+>>New or changed 'struct'
+
+struct thread in pintos/src/threads/thread.h,
+below variables are added.
+
+/* Defined due to mlfqs. */
     int nice;                           /* Nice value of thread. */
     num_17_14 recent_cpu;               /* Usage of cpu in recent.  */  
 
-For 17.14 Format, below definition are added.
+
+>>For 17.14 Format, below definition are added.
 
 /* 17.14 format properties. */
 typedef int num_17_14;
@@ -51,9 +168,9 @@ typedef int num_17_14;
 
 For datatype num_17_14, appropriate calulation was applied.
 
-Added global variable
+>>Added global variable
 
-In thread.c, the variable below are added due to mlfqs operation.
+In pintos/src/threads/thread.c, the variable below are added due to mlfqs operation.
 
 /* For mlfqs  */
 static int ready_threads;       /* # of ready threads + current threads */
@@ -63,10 +180,13 @@ static num_17_14 load_avg;      /* average load on cpu due to ready thread. */
 
 ---- ALGORITHMS ----
 
+
 >> Brieﬂy describe your implementation of 17.14 fixed-point number representation
+
 Pintos kernel doesn't support floating point calculation. When kernel needs calculation of rational value, representation for fraction is mendatory.
 17.14 fixed point number representation treats rightmost 14 bits as decimal, next 17 bits for integer and leftmost bit for sign.
 For appropriate calculation with other integer value which is defined as 'int', I declare new datatype num_17_14 and its fixed point ONE_17_14.
+
 
 ---- SYNCHRONIZATION ----
 
@@ -74,17 +194,34 @@ For appropriate calculation with other integer value which is defined as 'int', 
 By 'if' state and bool value thread_mlfqs, the code control between round-robin scheduler or multi-level feedback queue scheduler.
 It is controlled by kernel command option '-mlfqs'.
 
+
 ---- RATIONALE ----
 
->> Critique your design, pointing out advantages and disadvantages in
->> your design choices.
-
-Change of design of timer is more efficient than initial Pintos source code files.
-It checks every ticks whether to wake up or not. Change this to sleep & wake up algorithm makes usage of cpu efficient.
-
-*** about priority scheduling and donation
+Every test passed
 
 Multi-level Feedback Queue Scheduler (mlfqs) is 4.4 BSD-like scheduller.
 It gives priority to the process with interactive nature of cpu and other threads.
 This execute process by its priority and priority is calculated by equation.
 This let the system can execute threads by considering various needs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
