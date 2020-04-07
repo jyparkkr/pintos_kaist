@@ -112,16 +112,14 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
     
     /*these are for priority donation*/
-    int init_priority;
-    struct lock *wait_on_lock;
-    struct list donations;
-    struct list_elem donation_elem;
+    int init_priority;                 /*  */
+    struct lock *wait_on_lock;         /*  */
+    struct list donations;             /*  */
+    struct list_elem donation_elem;    /*  */
 
     /* Defined due to mlfqs. */
     int nice;                           /* Nice value of thread. */
     num_17_14 recent_cpu;               /* Usage of cpu in recent.  */  
-
-
   };
 
 /* If false (default), use round-robin scheduler.

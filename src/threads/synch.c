@@ -65,7 +65,8 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL);
+      list_insert_ordered(&sema->waiters, \
+        &thread_current()->elem, cmp_priority, NULL);
       thread_block ();
     }
   sema->value--;
@@ -110,8 +111,8 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)){
     list_sort (&sema->waiters, cmp_priority, NULL); 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+    thread_unblock (list_entry (\
+      list_pop_front (&sema->waiters), struct thread, elem));
   }
   sema->value++;
   /* priority preemption 코드 추가*/
@@ -198,7 +199,8 @@ lock_acquire (struct lock *lock)
   if (!thread_mlfqs){
     if(lock->holder!=NULL){/*if there already is a lock holder*/
       thread_current()->wait_on_lock = lock;
-      list_push_back (&lock->holder->donations, &thread_current()->donation_elem);
+      list_push_back (&lock->holder->donations, \
+        &thread_current()->donation_elem);
       donate_priority ();
     }
   }
@@ -293,12 +295,16 @@ cond_init (struct condition *cond)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-bool cmp_cond_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+bool cmp_cond_priority (const struct list_elem *a, \
+  const struct list_elem *b, void *aux UNUSED)
+{
   struct semaphore_elem *s_a = list_entry(a,struct semaphore_elem, elem);
   struct semaphore_elem *s_b= list_entry(b,struct semaphore_elem, elem);
 
-  struct thread *t_a = list_entry(list_begin(&s_a->semaphore.waiters),struct thread,elem);
-  struct thread *t_b = list_entry(list_begin(&s_b->semaphore.waiters),struct thread,elem);
+  struct thread *t_a = list_entry(\
+    list_begin(&s_a ->semaphore.waiters), struct thread,elem);
+  struct thread *t_b = list_entry(\
+    list_begin(&s_b ->semaphore.waiters), struct thread,elem);
   if (t_a->priority > t_b->priority)
     return 1;
   return 0;

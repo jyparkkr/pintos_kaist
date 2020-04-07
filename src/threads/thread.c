@@ -66,9 +66,9 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 bool thread_mlfqs;
 
 /* For mlfqs  */
-static int ready_threads;
-static num_17_14 decay;
-static num_17_14 load_avg;
+static int ready_threads;       /* # of ready threads + current threads */
+static num_17_14 decay;         /* decay for reduce recent_cpu in thread. */
+static num_17_14 load_avg;      /* average load on cpu due to ready thread. */
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -436,7 +436,9 @@ void test_max_priority (void){
 }
 
 /* Compare the priority of two threads. */
-bool cmp_priority (const struct list_elem *a,const struct list_elem *b,void *aux UNUSED){
+bool cmp_priority (const struct list_elem *a,\
+  const struct list_elem *b,void *aux UNUSED)
+{
   struct thread *t_a = list_entry(a, struct thread, elem);
   struct thread *t_b = list_entry(b, struct thread, elem);
   if (t_a->priority > t_b->priority)
@@ -518,9 +520,10 @@ mlfqs_recent_cpu (struct thread *t)
     num_17_14 recent_cpu = t->recent_cpu;
     int nice = t->nice; 
 
-    decay = ((int64_t) (2 * load_avg) * ONE_17_14) / (2 * load_avg + ONE_17_14);
-    recent_cpu = ((int64_t) recent_cpu) * decay / ONE_17_14 + nice * ONE_17_14;
-    //printf("load_avg: 0x%x, decay:0x%x, recent_cpu:0x%x\n", load_avg, decay, thread_get_recent_cpu());
+    decay = ((int64_t) \
+      (2 * load_avg) * ONE_17_14) / (2 * load_avg + ONE_17_14);
+    recent_cpu = ((int64_t) \
+      recent_cpu * decay / ONE_17_14 + nice * ONE_17_14);
     t->recent_cpu = recent_cpu;
   }
 }
@@ -815,7 +818,7 @@ thread_schedule_tail (struct thread *prev)
      pull out the rug under itself.  (We don't free
      initial_thread because its memory was not obtained via
      palloc().) */
-  if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
+  if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
     {
       ASSERT (prev != cur);
       palloc_free_page (prev);
