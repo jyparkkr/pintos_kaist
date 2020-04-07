@@ -207,6 +207,10 @@ lock_acquire (struct lock *lock)
 
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+
+  if (!thread_mlfqs){
+    /* priority donation stuff */
+  }
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -242,6 +246,10 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  if (!thread_mlfqs){
+    /* priority donation stuff */
+  }
 }
 
 /* Returns true if the current thread holds LOCK, false
