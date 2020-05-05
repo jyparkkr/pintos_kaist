@@ -3,6 +3,13 @@
 .DS_Store/
 .DS_Store
 
-*/.vscode/
-*/.vscode
+**/.vscode/
+**/.vscode
 .DS_Store
+
+src/utils
+
+#cscope
+*/cscope.files
+*/cscope.out
+
