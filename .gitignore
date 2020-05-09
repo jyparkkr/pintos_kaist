@@ -8,7 +8,6 @@
 .DS_Store
 
 src/utils/
-src/utils
 src/Make.config 
 src/devices/shutdown.c
 
