@@ -16,6 +16,8 @@
 **/*.json
 **/*.errors
 **/*.output
+**/*.d
+**/*.result
 **/*.o
 
 src/utils/
