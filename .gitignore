@@ -18,7 +18,7 @@
 **/*.output
 
 src/utils/
-src/Make.config 
+src/Make.config
 src/devices/shutdown.c
 
 
