@@ -16,6 +16,7 @@
 **/*.json
 **/*.errors
 **/*.output
+**/*.o
 
 src/utils/
 src/Make.config 
