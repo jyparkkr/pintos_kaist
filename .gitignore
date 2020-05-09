@@ -1,17 +1,24 @@
 # gitignore
-
+**/.DS_Store
+**/.DS_Store/
 .DS_Store/
 .DS_Store
 
 **/.vscode/
 **/.vscode
-.DS_Store
+
+#cscope
+*/cscope.files
+*/cscope.out
+
+
+**/*.zip
+**/*.json
+**/*.errors
+**/*.output
 
 src/utils/
 src/Make.config 
 src/devices/shutdown.c
 
-#cscope
-*/cscope.files
-*/cscope.out
 
