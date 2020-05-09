@@ -1,6 +1,0 @@
-Prototype mismatch: sub main::SIGVTALRM () vs none at /Users/jaeyoungpark/os/pintos/src/utils/pintos line 937.
-Constant subroutine SIGVTALRM redefined at /Users/jaeyoungpark/os/pintos/src/utils/pintos line 929.
-Use of uninitialized value $avg in numeric ge (>=) at /Users/jaeyoungpark/os/pintos/src/utils/pintos line 907.
-WARNING: Image format was not specified for '/var/folders/rs/dspw4w315lj5qf64ydlw0w480000gn/T/_iG8SxVd07.dsk' and probing guessed raw.
-         Automatically detecting the format is dangerous for raw images, write operations on block 0 will be restricted.
-         Specify the 'raw' format explicitly to remove the restrictions.
