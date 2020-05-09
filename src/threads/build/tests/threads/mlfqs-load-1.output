@@ -1,0 +1,28 @@
+qemu -hda /var/folders/rs/dspw4w315lj5qf64ydlw0w480000gn/T/iFHQ3KTdCX.dsk -m 4 -net none -nographic -monitor null
+c[?7l[2J[0mSeaBIOS (version rel-1.12.0-59-gc9ba5276e321-prebuilt.qemu.org)
+Booting from Hard Disk...
+PPiiLLoo  hhddaa1
+1
+LLooaaddiinngg.....................
+.
+Kernel command line: -q -mlfqs run mlfqs-load-1
+mlfqs mode
+Pintos booting with 3,968 kB RAM...
+367 pages available in kernel pool.
+367 pages available in user pool.
+Calibrating timer...  464,486,400 loops/s.
+Boot complete.
+Executing 'mlfqs-load-1':
+(mlfqs-load-1) begin
+(mlfqs-load-1) spinning for up to 45 seconds, please wait...
+(mlfqs-load-1) load average rose to 0.5 after 41 seconds
+(mlfqs-load-1) sleeping for another 10 seconds, please wait...
+(mlfqs-load-1) load average fell back below 0.5 (to 0.44)
+(mlfqs-load-1) PASS
+(mlfqs-load-1) end
+Execution of 'mlfqs-load-1' complete.
+Timer: 5200 ticks
+Thread: 1000 idle ticks, 4200 kernel ticks, 0 user ticks
+Console: 661 characters output
+Keyboard: 0 keys pressed
+Powering off...

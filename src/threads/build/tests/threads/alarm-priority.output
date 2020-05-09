@@ -1,0 +1,31 @@
+qemu -hda /var/folders/rs/dspw4w315lj5qf64ydlw0w480000gn/T/s5lJ5fe9kv.dsk -m 4 -net none -nographic -monitor null
+c[?7l[2J[0mSeaBIOS (version rel-1.12.0-59-gc9ba5276e321-prebuilt.qemu.org)
+Booting from Hard Disk...
+PPiiLLoo  hhddaa1
+1
+LLooaaddiinngg.....................
+Kernel command line: -q run alarm-priority
+Pintos booting with 3,968 kB RAM...
+367 pages available in kernel pool.
+367 pages available in user pool.
+Calibrating timer...  419,020,800 loops/s.
+Boot complete.
+Executing 'alarm-priority':
+(alarm-priority) begin
+(alarm-priority) Thread priority 30 woke up.
+(alarm-priority) Thread priority 29 woke up.
+(alarm-priority) Thread priority 28 woke up.
+(alarm-priority) Thread priority 27 woke up.
+(alarm-priority) Thread priority 26 woke up.
+(alarm-priority) Thread priority 25 woke up.
+(alarm-priority) Thread priority 24 woke up.
+(alarm-priority) Thread priority 23 woke up.
+(alarm-priority) Thread priority 22 woke up.
+(alarm-priority) Thread priority 21 woke up.
+(alarm-priority) end
+Execution of 'alarm-priority' complete.
+Timer: 523 ticks
+Thread: 490 idle ticks, 33 kernel ticks, 0 user ticks
+Console: 840 characters output
+Keyboard: 0 keys pressed
+Powering off...
