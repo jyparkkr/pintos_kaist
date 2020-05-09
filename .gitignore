@@ -22,6 +22,7 @@
 
 src/utils/
 src/Make.config
+src/Makefile.userprog
 src/devices/shutdown.c
 
 
