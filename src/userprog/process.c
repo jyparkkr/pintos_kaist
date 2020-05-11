@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -28,6 +29,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  //printf("process_execute\n");
   char *fn_copy;
   tid_t tid;
 
@@ -38,11 +40,72 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  char *save_ptr;
+  int name_len;
+  name_len = strlen(fn_copy) + 1;
+  //printf("name_len:%d\n", name_len);
+  char name[name_len];
+  strlcpy (name, file_name, PGSIZE);
+  strtok_r(name, " ", &save_ptr);
+  //printf("name:%s\n", name);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
+}
+
+/* pj2 - Save parsed token to user stack. */
+void
+argument_stack(char **parse, int count, void **esp)
+{
+  //printf("~~~~~~~~argument_stack init\n");
+  int acc_len = 0; //accmulated length
+  int align_length = 0;
+  int i, j;
+  /* push program name & param */
+  for (i = count - 1; i > -1; i--)
+  {
+    acc_len += strlen(parse[i]);
+    for (j = strlen(parse[i]); j > -1; j--)
+    {
+      *esp = *esp - 1;
+      **(char **)esp = parse[i][j];
+      align_length++;
+    }
+  }
+  /* Word-align */
+  //printf("word_align:%d\n", (4 - (align_length % 4)) % 4);
+  //printf("align_length:%d\n", align_length);
+
+  for (i = 0; i < (4 - (align_length % 4)) % 4;i++)
+  {
+    *esp = *esp - 1;
+    **(uint8_t **)esp = (uint8_t)0;
+  }
+  //char *argv_addr;
+  for (i = count; i > -1; i--)
+  {
+    *esp = *esp - 4;
+    if(i == count)
+    {
+      **(char* **)esp = (char *)0;
+    }
+    else
+    {
+      acc_len -= strlen(parse[i]);
+      **(char* **)esp = (char *) (*esp + 4*(count - i + 1) + acc_len);
+    }
+  }
+  /* argv push */
+  *esp = *esp - 4;
+  **(char* **)esp = (char *) (*esp + 4);
+  /* argc push */
+  *esp = *esp - 4;
+  **(int **)esp = (int) count;
+  /* fake addr */
+  *esp = *esp - 4;
+  **(int **)esp = (int) 0;
 }
 
 /* A thread function that loads a user process and starts it
@@ -50,21 +113,46 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  //printf("~~~~~~~~start_process init\n");
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  /* pj2 - tokenize:to parse & get token num: to count */
+  char *parse[127];
+  int count;
+  char *get_count, *save_ptr;
+
+  count=0;
+  for (get_count = strtok_r (file_name, " ", &save_ptr); get_count != NULL;
+    get_count = strtok_r (NULL, " ", &save_ptr))
+  {
+    parse[count] = get_count;
+    count++;
+  }
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (parse[0] ,&if_.eip, &if_.esp);
+  /* after memory load, resume parent process */
+  sema_up(&(thread_current()->sema_load));
+  /* Set up Stack */
+  if(success){
+    thread_current()->load = true;
+    argument_stack(parse, count, &if_.esp);
+  }
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success){
+    thread_current()->load = false; 
     thread_exit ();
+  }
+  
+  /* Debugging tool - hex_dump() */
+  hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -72,10 +160,39 @@ start_process (void *file_name_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
+  /* Start the user process */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
 
+/* pj2 - search child list by pid and return thread */
+struct thread
+*get_child_process (int pid)
+{
+  struct list *child_list;
+  child_list = &(thread_current()->child_list);
+
+  struct list_elem *e;
+  struct thread *t;
+  for (e = list_begin (child_list); e != list_end (child_list);
+       e = list_next (e))
+  {
+    t = list_entry (e, struct thread, childelem);
+    if(t -> tid == pid)
+      return t;
+  }
+  return NULL;
+}
+
+void
+remove_child_process (struct thread *cp)
+{
+  if (cp != NULL) 
+  {
+    list_remove(&(cp->childelem));
+    palloc_free_page(cp);
+  }
+}
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -86,9 +203,21 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  struct thread *child;
+  /*search process descriptor of child process*/ 
+  child = get_child_process(child_tid);
+  /*return -1 for any exception*/
+  if(!child)
+    return -1;
+
+/* make parent wait until child exit */
+  sema_down(&(child->sema_exit));
+  /*remove child process*/
+  remove_child_process(child); 
+
+  return child->exit_status;
 }
 
 /* Free the current process's resources. */
@@ -97,6 +226,21 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  /* pj2.5 - destroy the current process's page directory
+    and swtich back to kernel-only page directory */
+  lock_acquire(&filesys_lock);
+  file_close(cur->cur_file);
+  /* pj2.4 - close all opened files in current thread */
+  while(cur->fd_max > 2)
+  {
+    cur->fd_max -= 1;
+    /* file_allow_write is already implemented on process_close_file*/
+    process_close_file (cur->fd_max);
+  }
+  lock_release(&filesys_lock);
+  /* free fd_table */
+  palloc_free_page(cur->fd_table);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -114,6 +258,47 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+}
+
+int 
+process_add_file (struct file *f)
+{
+  struct thread *t;
+  int fd_max;
+  t = thread_current();
+  fd_max = t -> fd_max;
+  /* add file obj to fd table */
+  (t -> fd_table)[fd_max] = f;
+  /* increase fd_max */
+  t -> fd_max += 1;
+  /* return fd */
+  return fd_max;
+}
+
+/* pj2.4 - get fd of fd_max */
+struct file
+*process_get_file (int fd)
+{
+  if(fd < thread_current()->fd_max)
+  {
+    return thread_current()->fd_table[fd];
+  }
+  return NULL;
+}
+
+/* pj2.4 - get fd of fd_max */
+void 
+process_close_file (int fd)
+{
+  struct file* f;
+  f = process_get_file(fd);
+  if (f != NULL)
+  {
+    /* close file */
+    file_close(f);
+    /* clear fd_table */
+    thread_current()->fd_table[fd] = NULL;
+  }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -221,13 +406,23 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  /* acquire lock */
+  lock_acquire(&filesys_lock);
+
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
     {
+      /* release lock */
+      lock_release(&filesys_lock);
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  /* pj2.5 - init thread's current running file */
+  t->cur_file = file;
+  file_deny_write(file);
+  /* release lock */
+  lock_release(&filesys_lock);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -438,6 +633,7 @@ setup_stack (void **esp)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
+        //*esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }

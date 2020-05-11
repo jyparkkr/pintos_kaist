@@ -235,6 +235,20 @@ thread_create (const char *name, int priority,
 
   intr_set_level (old_level);
 
+  /* save parent process */
+  t->parent = thread_current();
+  /* program not loaded & exited */
+  t->load = false;
+  t->exit = false;
+  /* sema init to 0 */
+  sema_init(&t->sema_exit , 0);
+  sema_init(&t->sema_load , 0);
+  /* add to child list */
+  list_push_back(&(t->parent) -> child_list , &t -> childelem);
+
+  /* init fd */
+  t->fd_max = 2;
+  t->fd_table = palloc_get_page(0);
   /* Add to run queue. */
   thread_unblock (t);
   
@@ -370,6 +384,7 @@ void
 thread_exit (void) 
 {
   ASSERT (!intr_context ());
+  struct thread *t = thread_current ();
 
 #ifdef USERPROG
   process_exit ();
@@ -379,8 +394,14 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
+  list_remove (&t->allelem);
+  /* tell that process exits to process descriptor  */ 
+  /* parents process get out from block(using sema)*/
+  t->exit = true;
+  if(t!= initial_thread){
+    sema_up(&(t->sema_exit));
+  }
+  t->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -779,6 +800,9 @@ init_thread (struct thread *t, const char *name, int priority)
   /*priority donation*/
   list_init(&t->donations);
   t->init_priority = priority;
+
+  /* Initialize child list */
+  list_init(&t -> child_list);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -850,9 +874,8 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
     {
       ASSERT (prev != cur);
-      palloc_free_page (prev);
     }
-}
+} 
 
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
