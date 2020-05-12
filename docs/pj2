@@ -197,8 +197,6 @@ For this, add file *cur_file on struct thread and deny writing on load.
 
 
 ---- SYNCHRONIZATION ----
-In accessing file system to load on file system, lock is acquired.
-When process_exit() and close file, lock is released.
 
 
 ---- RATIONALE ----
