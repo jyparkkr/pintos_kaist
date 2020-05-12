@@ -41,6 +41,17 @@ void get_argument(void *esp, int *arg , int count) {
 		arg[i] = *(int*)(esp+4*(i+1));
 	}
 } 
+/* Writes BYTE to user address UDST.
+   UDST must be below PHYS_BASE. 
+   Returns true if successful, false if a segfault occurred.*/
+static bool
+put_user (uint8_t *udst, uint8_t byte)
+{
+    int error_code;
+    asm ("movl $1f, %0; movb %b2, %1; 1:"
+        : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+    return error_code != -1;
+}
 
 
 
@@ -230,13 +241,14 @@ int read (int fd, void *buffer, unsigned size) {
 } 
 int write(int fd, void *buffer, unsigned size) { 
 	int size_write=0;
-	//int check;
 	/* use lock to prevent simultaneous approach*/ 
 	lock_acquire(&filesys_lock);
 	/* If fd is 1, print the save value in buffer and return the buffer size(use putbuf()) */ 
 	if(fd==1){
 		putbuf((const char *)buffer,size);
 		size_write = size;
+		lock_release(&filesys_lock);
+		return size_write;
 	}
 	/* If fd is not 1 write the data to the file for the size and return the written byte number */ 
 	else{	
@@ -244,19 +256,8 @@ int write(int fd, void *buffer, unsigned size) {
 		struct file *searching_file = process_get_file(fd);
 		if(searching_file==NULL){
 			lock_release(&filesys_lock);
-			return 0;
+			return -1;
 		}
-		/*else if(!put_user((uint8_t*)buffer,size)){
-			lock_release(&filesys_lock);
-    		exit(-1);
-		}*/
-		/*for(check=0;check<(signed)size;check++){
-    		if(!put_user(buffer,0)){
-				lock_release(&filesys_lock);
-    			exit(-1);
-    		}
-    	}*/
-    	
 		size_write=file_write(searching_file,(const void*)buffer,size);
 	}
 	lock_release(&filesys_lock);
