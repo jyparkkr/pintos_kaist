@@ -52,6 +52,7 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+ 
   return tid;
 }
 
@@ -139,6 +140,7 @@ start_process (void *file_name_)
   success = load (parse[0] ,&if_.eip, &if_.esp);
   /* after memory load, resume parent process */
   sema_up(&(thread_current()->sema_load));
+
   /* Set up Stack */
   if(success){
     thread_current()->load = true;
@@ -232,8 +234,8 @@ process_exit (void)
 
   /* pj2.5 - destroy the current process's page directory
     and swtich back to kernel-only page directory */
-  lock_acquire(&filesys_lock);
-  
+  //lock_acquire(&filesys_lock);
+
   file_close(cur->cur_file);
   /* pj2.4 - close all opened files in current thread */
   while(cur->fd_max > 2)
@@ -242,7 +244,7 @@ process_exit (void)
     /* file_allow_write is already implemented on process_close_file*/
     process_close_file (cur->fd_max);
   }
-  lock_release(&filesys_lock);
+  //lock_release(&filesys_lock);
   /* free fd_table */
   palloc_free_page(cur->fd_table);
 
