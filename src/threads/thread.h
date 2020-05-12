@@ -124,21 +124,20 @@ struct thread
  
  /* For pj2 - child/parent process connection */
     /* process hierarchy */
-    struct thread *parent;              /*descriptor of parents process*/
-    struct list_elem childelem;        /*element of child list*/
-    struct list child_list;             /*child list*/
+    struct thread *parent;           /*descriptor of parents process*/
+    struct list_elem childelem;      /*element of child list*/
+    struct list child_list;          /*child list*/
 
-    bool load;                           /*existence of load*/
-    bool exit;                          /*whether exit*/
-    struct semaphore sema_exit;         /*exit semaphore*/
-    struct semaphore sema_load;         /*load semaphore*/
-    int exit_status;                    /*status of exit call*/
+    bool load;                       /*existence of load*/
+    bool exit;                       /*whether exit*/
+    struct semaphore sema_exit;      /*exit semaphore*/
+    struct semaphore sema_load;      /*load semaphore*/
+    int exit_status;                 /*status of exit call*/
     /* file descriptor */
-    struct file **fd_table;                   /*file descriptor table*/
-    int fd_max;                         /*maximum fd value +1 which exist in current table*/
+    struct file **fd_table;          /*file descriptor table*/
+    int fd_max;                      /*maximum fd value exists on current table*/
     /* denying write to executable */
-    struct file *cur_file;
-    
+    struct file *cur_file;           /* current running file */
   };
 
 /* If false (default), use round-robin scheduler.
@@ -197,6 +196,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
 
 #endif /* threads/thread.h */

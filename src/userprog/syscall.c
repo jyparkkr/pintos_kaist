@@ -32,11 +32,10 @@ void check_address(void *addr){
 	}*/
 }
 
+/* move user data to kernel */
 void get_argument(void *esp, int *arg , int count) { 
 	int i;
-/* 유저 스택에 저장된 인자값들을 커널로 저장 */ 
 	for(i=0; i<count; i++){
-	/* 인자가 저장된 위치가 유저영역인지 확인 */ 
 		check_address(esp+4*(i+1));
 		check_address(esp+4*(i+1)+3);
 		arg[i] = *(int*)(esp+4*(i+1));

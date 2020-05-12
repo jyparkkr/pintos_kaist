@@ -185,6 +185,8 @@ struct thread
   return NULL;
 }
 
+
+/* search child list by pid and remove it  */
 void
 remove_child_process (struct thread *cp)
 {
@@ -264,6 +266,8 @@ process_exit (void)
     }
 }
 
+
+/* add file on file description table */
 int 
 process_add_file (struct file *f)
 {
@@ -279,7 +283,7 @@ process_add_file (struct file *f)
   return fd_max;
 }
 
-/* pj2.4 - get fd of fd_max */
+/* pj2.4 - get file descriptor from fd_table */
 struct file
 *process_get_file (int fd)
 {
@@ -290,7 +294,7 @@ struct file
   return NULL;
 }
 
-/* pj2.4 - get fd of fd_max */
+/* pj2.4 - close file descriptor */
 void 
 process_close_file (int fd)
 {

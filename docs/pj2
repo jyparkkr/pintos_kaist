@@ -1,0 +1,206 @@
++-------------------------+
+|          EE 415         |
+|         PROJECT 2       |
+|      DESIGN DOCUMENT    |
++-------------------------+
+
+---- GROUP ----
+
+20170088 김문성 ms721@kaist.ac.kr
+20170276 박재영 jypark_korea@kaist.ac.kr
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for
+>> the TAs, or extra credit, please give them here.
+
+No comments
+
+>> Please cite any oﬄine or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation,
+>> course text, and lecture notes.
+
+Lecture note of Pintos Project Slide Set in https://oslab.kaist.ac.kr/ee415-spring-2020/.
+
+Command Line Execute
+=====================
+---- DATA STRUCTURES ----
+>>new or changes 'struct'
+
+>>Added global variable
+
+
+---- ALGORITHMS ----
+>> Brieﬂy describe your implementation for Command Line Execute
+In function tid_t process_execute(), it originally pass whole command line to 
+thread_create func, it parses command line by space and pass first element
+(which is user process name) to tid_t thread_create() by using strktok_r().
+
+Command line should be parsed and insert on stack. For these, declare new function,
+void argument_stack(**args, count, **esp) which insert argument to stack.
+For argument parsing, strktok_r() also used.
+
+When inserting to stack, align is needed, since all address is multiple of four.
+Insert appropriate number of 0 after inserting command line argument to stack, and
+insert the address of arguments on stack.
+
+
+---- RATIONALE ----
+
+for $pintos -v --run 'echo x' command, result of hex_dump() is same as provided.
+
+
+
+System Call Handler
+=====================
+---- DATA STRUCTURES ----
+>>new or changes 'struct'
+
+>>Added global variable
+
+---- ALGORITHMS ----
+>> Brieﬂy describe your implementation of System Call Handler
+System Call handler and System calls(halt, exit, create, remove) are coded on
+ this field. Since system call runs on kernel, althogh it is called on user, 
+ appropriate handler is needed to run.
+ syscall_handler first get stack pointer from interrupt frame, then get system
+ call number from stack. Action for each system call number goes on switch-case
+ and for each number, it calls its function.
+ In address of arguments are in stack. It must point user area of memory, so there
+ is void check_address(void *addr) which check the address pointer is in user memory.
+ Also stack arguments in user memory should copyed to kerenl. get_argument() is work
+ on this job.
+System call Description
+halt: quit pintos
+exit: stop current running process. It prints exit status, which 0 is for no error.
+create: create file. It returns true for success, false otherwise.
+remove: remove file. It returns true for success, false otherwise.
+
+---- SYNCHRONIZATION ----
+
+
+---- RATIONALE ----
+
+all related test passed.
+
+
+
+Process Hierarchy
+=====================
+---- DATA STRUCTURES ----
+>>new or changes 'struct'
+
+In struct thread,
+    struct thread *parent;           /*descriptor of parents process*/
+    struct list_elem childelem;      /*element of child list*/
+    struct list child_list;          /*child list*/
+
+    bool load;                       /*existence of load*/
+    bool exit;                       /*whether exit*/
+    struct semaphore sema_exit;      /*exit semaphore*/
+    struct semaphore sema_load;      /*load semaphore*/
+    int exit_status;                 /*status of exit call*/
+declared.
+
+>>Added global variable
+
+
+---- SYNCHRONIZATION ----
+sema_down() on exec() so that it waits until child process program are loaded.
+sema_up() on start_process() after load() so that parent can continue.
+sema_down() on process_wait() to wait child process ended.
+sema_up() on thread_exit() to resume parent process.
+
+
+---- ALGORITHMS ----
+>> Brieﬂy describe your implementation of Process Hierarchy
+Process Hierarchy add parent & child for thread.
+So appropriate fields are added on struct thread. Also, its corresponding
+system call exec() and wait() are added.
+process_wait() is edited to wait until user process is executed and ended
+by semaphore. If there is sema_up() to parent, it would wait until child calls
+sema_down().
+For exec() system call, it would create&run child process. Until child runs, parent
+would standby through semaphore. process_wait() function (which is called by wait())
+was initially return -1, change it to wait until child process to be done and check
+its status with semaphore.
+Also since thread is managed by list structure, some function is used to manage 
+execute and wait.
+
+---- RATIONALE ----
+
+all related test passed except multi-oom.
+
+
+File Descriptor
+=====================
+---- DATA STRUCTURES ----
+>>new or changes 'struct'
+
+In struct thread,
+    struct file **fd_table;          /*file descriptor table*/
+    int fd_max;                      /*maximum fd value exists on current table*/
+declared.
+
+>>Added global variable
+
+In syscall.h,
+struct lock filesys_lock; 
+declared.
+
+
+---- ALGORITHMS ----
+>> Brieﬂy describe your implementation of File Descriptor
+For I/O (to file or stdio) this section is necessary.
+Create file descriptor table(fd_table on the code) are on struct thread and managed.
+It is initialized on thread_create(), and when process_exit() is called, all files 
+opened on process are also closed. For opening file, there is field fd_num on struct
+thread, which is maximum possible count of file descriptor(since it starts from 0).
+So if new file is opened, then this value can be used to its fd_table index.
+To prove access on file in various process, lock is used to file. When file is opened,
+lock is on the file, closed then lock is released.
+System call read(), write(), open() and syscall() were also added. open() open files, 
+if there is no file, then retures -1, otherwise its file descriptor. syscall() returns
+ length of file. read() and write() needs lock not to access at the same time. For 
+ file_descriptor is 0 or 1, it is stdio, so use input_getc() or putbuf(). 
+ seek(), tell(), close() is also added on this field. seek() change offest of file by
+ position. tell() return opened location of file. close() close file by fd and
+  initialize fd entry.
+  For page fault, exit(-1) is added for bad input test.
+
+
+---- SYNCHRONIZATION ----
+During read and write, no prevent concurrent access to file, lock is used.
+Before and after read/write file, lock should be acquire and released.
+
+
+---- RATIONALE ----
+
+all related test passed.
+
+
+Denying Write to Execute
+=======================
+---- DATA STRUCTURES ----
+>>new or changes 'struct'
+In struct thread,
+    struct file *cur_file;           /* current running file */
+declared.
+
+>>Added global variable
+
+
+---- ALGORITHMS ----
+>> Brieﬂy describe your implementation of "Denying Write to Execute"
+To prevent write on opened file, pintos should deny new writing on those files.
+For this, add file *cur_file on struct thread and deny writing on load.
+
+
+---- SYNCHRONIZATION ----
+In accessing file system to load on file system, lock is acquired.
+When process_exit() and close file, lock is released.
+
+
+---- RATIONALE ----
+
+all related test passed.
