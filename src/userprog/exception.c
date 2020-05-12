@@ -149,6 +149,8 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   /* pj2.4 - page fault occur -> call exit(-1) */
+  f->eip = (void*)f->eax;
+  f->eax = 0xffffffff;
   exit(-1);
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

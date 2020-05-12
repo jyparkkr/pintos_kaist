@@ -10,6 +10,7 @@
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include "devices/input.h"
+#include "filesys/off_t.h"
 
 
 
@@ -26,6 +27,9 @@ void check_address(void *addr){
 	if(!(is_user_vaddr(addr) && addr>=((void *) 0x8048000))){
 		exit(-1);
 	}
+	/*if(pagedir_get_page(thread_current()->pagedir, addr) == NULL){
+		exit(-1);
+	}*/
 }
 
 void get_argument(void *esp, int *arg , int count) { 
@@ -39,14 +43,16 @@ void get_argument(void *esp, int *arg , int count) {
 	}
 } 
 
+
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
- 	printf ("system call!\n");
  	int arg[5];
  	uint32_t *sp = f -> esp; /* userstack pointer */ 
  	check_address((void *)sp); 
  	int syscall_n = *sp;   /* system call number */
+ 	//int check = 0;
 
  	switch(syscall_n){
 		case SYS_HALT:
@@ -58,7 +64,6 @@ syscall_handler (struct intr_frame *f)
 			break;                     
     	case SYS_EXEC:
     		get_argument(sp , arg , 1); 
-    		printf("%d\n",arg[0]);
     		check_address((void *)arg[0]); 
     		f -> eax = exec((const char *)arg[0]); 
 			break;                     
@@ -92,17 +97,24 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,3);
     		check_address((void*)arg[1]);
     		check_address((void*)arg[1]+(unsigned)arg[2]);
+    		/*for(check=0;check<(signed)arg[2];check++){
+    			if(!get_user((void*)arg[1]+check))
+    				exit(-1);
+    		}*/
     		f -> eax = read(arg[0],(void*)arg[1], (unsigned)arg[2]);  
 			break;                 
     	case SYS_WRITE: 
     		get_argument(sp,arg,3);
     		check_address((void*)arg[1]);
     		check_address((void*)arg[1]+(unsigned)arg[2]);
+    		/*for(check=0;check<(signed)arg[2];check++){
+    			if(!put_user((void*)arg[1]+check,0))
+    				exit(-1);
+    		}*/
     		f -> eax = write(arg[0],(void*)arg[1], (unsigned)arg[2]);  
 			break;                 
     	case SYS_SEEK:  
     		get_argument(sp,arg,2);
-    		//f -> eax = 
     		seek(arg[0],(unsigned)arg[1]);  
 			break;                  
     	case SYS_TELL:   
@@ -111,14 +123,11 @@ syscall_handler (struct intr_frame *f)
 			break;                 
     	case SYS_CLOSE:  
     		get_argument(sp,arg,1);
-    		//f -> eax = 
     		close(arg[0]);
 			break;  
-		default:
-			exit(-1);
+		/*default:
+			exit(-1);*/
  	}
-
-  //thread_exit ();
 }
 
 void halt (void) { 
@@ -132,7 +141,7 @@ void exit (int status) {
 	/*save exit status to process descriptor*/
 	t->exit_status = status;
 	/*print the process exit message as "process name : exit(status)"*/
-	printf("%s : exit(%d)\n",t->name,status);    
+	printf("%s: exit(%d)\n",t->name,status);    
 	/* exit thread */ 
 	thread_exit();
 } 
@@ -211,15 +220,18 @@ int read (int fd, void *buffer, unsigned size) {
 	else{	
 		/* search file using file director*/ 
 		struct file *searching_file = process_get_file(fd);
-		if(!searching_file)
+		if(searching_file==NULL){
+			lock_release(&filesys_lock);
 			return -1;
+		}
 		size_read = file_read(searching_file,buffer,size);
 	}
 	lock_release(&filesys_lock);
 	return size_read;
 } 
 int write(int fd, void *buffer, unsigned size) { 
-	int size_write;
+	int size_write=0;
+	//int check;
 	/* use lock to prevent simultaneous approach*/ 
 	lock_acquire(&filesys_lock);
 	/* If fd is 1, print the save value in buffer and return the buffer size(use putbuf()) */ 
@@ -231,9 +243,22 @@ int write(int fd, void *buffer, unsigned size) {
 	else{	
 		/* search file using file director*/ 
 		struct file *searching_file = process_get_file(fd);
-		if(!searching_file)
-			return -1;
-		size_write = file_write(searching_file,(const void*)buffer,size);
+		if(searching_file==NULL){
+			lock_release(&filesys_lock);
+			return 0;
+		}
+		/*else if(!put_user((uint8_t*)buffer,size)){
+			lock_release(&filesys_lock);
+    		exit(-1);
+		}*/
+		/*for(check=0;check<(signed)size;check++){
+    		if(!put_user(buffer,0)){
+				lock_release(&filesys_lock);
+    			exit(-1);
+    		}
+    	}*/
+    	
+		size_write=file_write(searching_file,(const void*)buffer,size);
 	}
 	lock_release(&filesys_lock);
 	return size_write;

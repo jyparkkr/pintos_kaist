@@ -57,16 +57,14 @@ process_execute (const char *file_name)
 
 /* pj2 - Save parsed token to user stack. */
 void
-argument_stack(char **parse, int count, void **esp)
+argument_stack (char **parse, int count, void **esp)
 {
   //printf("~~~~~~~~argument_stack init\n");
-  int acc_len = 0; //accmulated length
   int align_length = 0;
   int i, j;
   /* push program name & param */
   for (i = count - 1; i > -1; i--)
   {
-    acc_len += strlen(parse[i]);
     for (j = strlen(parse[i]); j > -1; j--)
     {
       *esp = *esp - 1;
@@ -78,11 +76,13 @@ argument_stack(char **parse, int count, void **esp)
   //printf("word_align:%d\n", (4 - (align_length % 4)) % 4);
   //printf("align_length:%d\n", align_length);
 
-  for (i = 0; i < (4 - (align_length % 4)) % 4;i++)
+  for (i = 0; i < (4 - (-align_length % 4)) % 4;i++)
   {
     *esp = *esp - 1;
     **(uint8_t **)esp = (uint8_t)0;
+    align_length += 1;
   }
+
   //char *argv_addr;
   for (i = count; i > -1; i--)
   {
@@ -93,8 +93,9 @@ argument_stack(char **parse, int count, void **esp)
     }
     else
     {
-      acc_len -= strlen(parse[i]);
-      **(char* **)esp = (char *) (*esp + 4*(count - i + 1) + acc_len);
+      align_length -= strlen(parse[i]);
+      align_length -= 1;
+      **(char* **)esp = (char *) (*esp + 4*(count - i + 1) + align_length);
     }
   }
   /* argv push */
@@ -152,7 +153,7 @@ start_process (void *file_name_)
   }
   
   /* Debugging tool - hex_dump() */
-  hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+ // hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -205,19 +206,21 @@ remove_child_process (struct thread *cp)
 int
 process_wait (tid_t child_tid) 
 {
+  int status;
   struct thread *child;
   /*search process descriptor of child process*/ 
   child = get_child_process(child_tid);
   /*return -1 for any exception*/
-  if(!child)
+  if(child==NULL)
     return -1;
 
 /* make parent wait until child exit */
   sema_down(&(child->sema_exit));
+  status = child->exit_status;
   /*remove child process*/
   remove_child_process(child); 
 
-  return child->exit_status;
+  return status;
 }
 
 /* Free the current process's resources. */
@@ -230,6 +233,7 @@ process_exit (void)
   /* pj2.5 - destroy the current process's page directory
     and swtich back to kernel-only page directory */
   lock_acquire(&filesys_lock);
+  
   file_close(cur->cur_file);
   /* pj2.4 - close all opened files in current thread */
   while(cur->fd_max > 2)
@@ -279,7 +283,7 @@ process_add_file (struct file *f)
 struct file
 *process_get_file (int fd)
 {
-  if(fd < thread_current()->fd_max)
+  if(fd < thread_current()->fd_max && fd>=0)
   {
     return thread_current()->fd_table[fd];
   }
@@ -495,6 +499,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
           break;
         }
     }
+  /* release lock */
+  //lock_release(&filesys_lock);
 
   /* Set up stack. */
   if (!setup_stack (esp))
@@ -507,7 +513,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   return success;
 }
 

@@ -248,7 +248,7 @@ thread_create (const char *name, int priority,
 
   /* init fd */
   t->fd_max = 2;
-  t->fd_table = palloc_get_page(0);
+  t->fd_table = palloc_get_page(PAL_ZERO);
   /* Add to run queue. */
   thread_unblock (t);
   
@@ -398,6 +398,7 @@ thread_exit (void)
   /* tell that process exits to process descriptor  */ 
   /* parents process get out from block(using sema)*/
   t->exit = true;
+  //palloc_free_page (t->fd_table);
   if(t!= initial_thread){
     sema_up(&(t->sema_exit));
   }
