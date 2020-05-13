@@ -11,6 +11,7 @@
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "filesys/off_t.h"
+#include "threads/palloc.h"
 
 
 
@@ -42,19 +43,6 @@ void get_argument(void *esp, int *arg , int count) {
 		arg[i] = *(int*)(esp+4*(i+1));
 	}
 } 
-/* Writes BYTE to user address UDST.
-   UDST must be below PHYS_BASE. 
-   Returns true if successful, false if a segfault occurred.*/
-static bool
-put_user (uint8_t *udst, uint8_t byte)
-{
-    int error_code;
-    asm ("movl $1f, %0; movb %b2, %1; 1:"
-        : "=&a" (error_code), "=m" (*udst) : "q" (byte));
-    return error_code != -1;
-}
-
-
 
 static void
 syscall_handler (struct intr_frame *f) 
@@ -62,10 +50,10 @@ syscall_handler (struct intr_frame *f)
  	int arg[5];
  	uint32_t *sp = f -> esp; /* userstack pointer */ 
  	check_address((void *)sp); 
- 	int syscall_n = *sp;   /* system call number */
+ 	int number = *sp;   /* system call number */
  	//int check = 0;
 
- 	switch(syscall_n){
+ 	switch(number){
 		case SYS_HALT:
 			halt();
 			break;                   
@@ -108,20 +96,12 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,3);
     		check_address((void*)arg[1]);
     		check_address((void*)arg[1]+(unsigned)arg[2]);
-    		/*for(check=0;check<(signed)arg[2];check++){
-    			if(!get_user((void*)arg[1]+check))
-    				exit(-1);
-    		}*/
     		f -> eax = read(arg[0],(void*)arg[1], (unsigned)arg[2]);  
 			break;                 
     	case SYS_WRITE: 
     		get_argument(sp,arg,3);
     		check_address((void*)arg[1]);
     		check_address((void*)arg[1]+(unsigned)arg[2]);
-    		/*for(check=0;check<(signed)arg[2];check++){
-    			if(!put_user((void*)arg[1]+check,0))
-    				exit(-1);
-    		}*/
     		f -> eax = write(arg[0],(void*)arg[1], (unsigned)arg[2]);  
 			break;                 
     	case SYS_SEEK:  
@@ -136,8 +116,8 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,1);
     		close(arg[0]);
 			break;  
-		/*default:
-			exit(-1);*/
+		default:
+			exit(-1);
  	}
 }
 
@@ -160,7 +140,9 @@ void exit (int status) {
 tid_t exec (const char *cmd_line){
 	/* create child process by process_execute() */
 	tid_t child;
-	child = process_execute (cmd_line);
+	if((child = process_execute (cmd_line))==TID_ERROR){
+		return TID_ERROR;
+	}
 	/* search pid of child process */
 	struct thread *t;
 	t = get_child_process (child);
@@ -195,10 +177,11 @@ int open(const char *file) {
 	/* open file*/ 
 	struct file *open_file = filesys_open(file); 
 	/* return -1 if open_file does not exist */ 
-	if(!open_file)
+	if(!open_file){
 		return -1;
+	}
 	/*give fd to open_file and return fd */
-	return process_add_file(open_file); 
+	return process_add_file(open_file);
 }
 int filesize (int fd) { 
 	int length;

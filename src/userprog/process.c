@@ -32,6 +32,8 @@ process_execute (const char *file_name)
   //printf("process_execute\n");
   char *fn_copy;
   tid_t tid;
+  //struct list_elem *e;
+  //struct thread *t;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -50,9 +52,16 @@ process_execute (const char *file_name)
   //printf("name:%s\n", name);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
+  //sema_down(&thread_current()->sema_load);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
- 
+  /*for (e = list_begin (&thread_current()->child_list); e != list_end (&thread_current()->child_list); e = list_next (e))
+  {
+    t = list_entry (e, struct thread, childelem);
+    if (t->exit_status == -1) {
+      return process_wait(tid);
+    }
+  }*/
   return tid;
 }
 
@@ -146,6 +155,8 @@ start_process (void *file_name_)
     thread_current()->load = true;
     argument_stack(parse, count, &if_.esp);
   }
+  //sema_up(&thread_current()->parent->sema_load);
+
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -232,9 +243,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+
+
   /* pj2.5 - destroy the current process's page directory
     and swtich back to kernel-only page directory */
-  //lock_acquire(&filesys_lock);
 
   file_close(cur->cur_file);
   /* pj2.4 - close all opened files in current thread */
@@ -244,7 +256,6 @@ process_exit (void)
     /* file_allow_write is already implemented on process_close_file*/
     process_close_file (cur->fd_max);
   }
-  //lock_release(&filesys_lock);
   /* free fd_table */
   palloc_free_page(cur->fd_table);
 

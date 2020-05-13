@@ -249,7 +249,9 @@ thread_create (const char *name, int priority,
 
   /* init fd */
   t->fd_max = 2;
-  t->fd_table = palloc_get_page(PAL_ZERO);
+  t->fd_table = palloc_get_page(0);
+  /*if(t->fd_table == NULL)
+    return TID_ERROR;*/
   /* Add to run queue. */
   thread_unblock (t);
   
@@ -385,15 +387,23 @@ void
 thread_exit (void) 
 {
   ASSERT (!intr_context ());
-  struct thread *t = thread_current ();
 
 #ifdef USERPROG
   process_exit ();
 #endif
-
+  struct thread *t = thread_current ();
+ /* struct list_elem *child;
+  for (child = list_begin (&t->child_list);
+      child != list_end (&t->child_list); )
+  {
+    child = list_remove (child);
+  }*/
+  //if(t!= initial_thread){
+    //sema_up(&(t->sema_exit));
+  //}
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
-     when it calls thread_schedule_tail(). */
+     when it calls thread_schedule_tail()! */
   intr_disable ();
   list_remove (&t->allelem);
   /* tell that process exits to process descriptor  */ 
