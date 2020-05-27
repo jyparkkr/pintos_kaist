@@ -234,7 +234,7 @@ process_exit (void)
 
   /* pj2.5 - destroy the current process's page directory
     and swtich back to kernel-only page directory */
-  lock_acquire(&filesys_lock);
+  //lock_acquire(&filesys_lock);
   
   file_close(cur->cur_file);
   /* pj2.4 - close all opened files in current thread */
@@ -244,7 +244,7 @@ process_exit (void)
     /* file_allow_write is already implemented on process_close_file*/
     process_close_file (cur->fd_max);
   }
-  lock_release(&filesys_lock);
+  //lock_release(&filesys_lock);
   /* free fd_table */
   palloc_free_page(cur->fd_table);
 
@@ -430,7 +430,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   t->cur_file = file;
   file_deny_write(file);
   /* release lock */
-  lock_release(&filesys_lock);
+  //lock_release(&filesys_lock);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
