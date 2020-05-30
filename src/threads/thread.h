@@ -4,8 +4,10 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <hash.h>
 #include "threads/synch.h"
 #include "filesys/file.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -111,6 +113,9 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    /*For pj3 virtual memory*/
+    struct hash vm; /* Hashtable for virtual address space that thread owns*/
     
     /*these are for priority donation*/
     int init_priority;               /* To initialize after donation */

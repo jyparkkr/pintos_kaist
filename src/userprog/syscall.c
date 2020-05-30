@@ -23,21 +23,56 @@ syscall_init (void)
   lock_init(&filesys_lock); 
 }
 
-void check_address(void *addr){
+struct vm_entry* check_address(void *addr, void* esp UNUSED){
 	if(!(is_user_vaddr(addr) && addr>=((void *) 0x8048000))){
 		exit(-1);
 	}
-	/*if(pagedir_get_page(thread_current()->pagedir, addr) == NULL){
+	/*addr이 vm_entry에 존재하면 vm_entry를 반환하도록 코드 작성 */
+	struct vm_entry *vme;
+	/*find_vme() 사용*/
+	vme=find_vme(addr);
+	if(vme==NULL)
 		exit(-1);
-	}*/
+	return vme;
 }
+void check_valid_buffer (void *buffer, unsigned size, void *esp, bool to_write) { 
+	struct vm_entry *vme;
+	unsigned check =0;
+/* size from buffer to buffer + size can be bigger than the size of one page*/
+/*  So we should check vm_entries that included in the address from buffer to buffer + size */
+	while(check<size){
+/* check if the address is valid and get vm_entry structure by check_address*/
+		vme=check_address(buffer, esp);
+/*check the existence of vm_entry for that address and if vm_entry->writable is true*/
+		if(vme!=NULL)
+			if(to_write == true && vme->writable==false)
+				exit(-1);
+		buffer++;
+		check++;
+	}
+	buffer=buffer-check;
+}
+
+void check_valid_string (const void *str, void *esp) { 
+/* str에 대한 vm_entry의 존재 여부를 확인*/
+ /* check_address()사용*/ 
+	int count=0;
+	while((char*)str != 0)
+	{
+		check_address((void*)str, esp);
+		str ++;
+		count++;
+	}
+	str=str-count;
+}
+
 
 /* move user data to kernel */
 void get_argument(void *esp, int *arg , int count) { 
 	int i;
 	for(i=0; i<count; i++){
-		check_address(esp+4*(i+1));
-		check_address(esp+4*(i+1)+3);
+		check_address(esp+4*(i+1),esp);
+		check_address(esp+4*(i+1)+3,esp);
 		arg[i] = *(int*)(esp+4*(i+1));
 	}
 } 
@@ -60,7 +95,7 @@ syscall_handler (struct intr_frame *f)
 {
  	int arg[5];
  	uint32_t *sp = f -> esp; /* userstack pointer */ 
- 	check_address((void *)sp); 
+ 	check_address((void *)sp,f->esp); 
  	int syscall_n = *sp;   /* system call number */
  	//int check = 0;
 
@@ -74,7 +109,7 @@ syscall_handler (struct intr_frame *f)
 			break;                     
     	case SYS_EXEC:
     		get_argument(sp , arg , 1); 
-    		check_address((void *)arg[0]); 
+    		check_valid_string((const void *)arg[0], f->esp);
     		f -> eax = exec((const char *)arg[0]); 
 			break;                     
     	case SYS_WAIT:
@@ -83,20 +118,19 @@ syscall_handler (struct intr_frame *f)
 			break;                 
     	case SYS_CREATE: 
     		get_argument(sp,arg,2);
-    		check_address((void*)arg[0]);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		check_address((void*)arg[0],f->esp);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]),f->esp);
     		f -> eax = create((const char*)arg[0],(unsigned)arg[1]);
 			break;                   
     	case SYS_REMOVE:
     		get_argument(sp,arg,1);
-    		check_address((void*)arg[0]);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		check_address((void*)arg[0],f->esp);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]),f->esp);
     		f -> eax = remove((const char*)arg[0]);
 			break;                     
     	case SYS_OPEN: 
     		get_argument(sp,arg,1);
-    		check_address((void*)arg[0]);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		check_valid_string((const void *)arg[0], f->esp);
     		f -> eax = open((const char*)arg[0]);
 			break;                      
     	case SYS_FILESIZE:  
@@ -105,8 +139,9 @@ syscall_handler (struct intr_frame *f)
 			break;               
     	case SYS_READ:   
     		get_argument(sp,arg,3);
-    		check_address((void*)arg[1]);
-    		check_address((void*)arg[1]+(unsigned)arg[2]);
+    		check_valid_buffer((void *)arg[1], (unsigned)arg[2], f->esp, true);
+    		//check_address((void*)arg[1]);
+    		//check_address((void*)arg[1]+(unsigned)arg[2]);
     		/*for(check=0;check<(signed)arg[2];check++){
     			if(!get_user((void*)arg[1]+check))
     				exit(-1);
@@ -115,8 +150,7 @@ syscall_handler (struct intr_frame *f)
 			break;                 
     	case SYS_WRITE: 
     		get_argument(sp,arg,3);
-    		check_address((void*)arg[1]);
-    		check_address((void*)arg[1]+(unsigned)arg[2]);
+    		check_valid_buffer((void *)arg[1], (unsigned)arg[2], f->esp, false);
     		/*for(check=0;check<(signed)arg[2];check++){
     			if(!put_user((void*)arg[1]+check,0))
     				exit(-1);

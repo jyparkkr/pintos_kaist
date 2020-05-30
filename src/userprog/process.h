@@ -18,4 +18,6 @@ void process_close_file (int fd);
 struct thread *get_child_process (int pid);
 void remove_child_process(struct thread *cp);
 
+bool handle_mm_fault(struct vm_entry *vme);
+
 #endif /* userprog/process.h */

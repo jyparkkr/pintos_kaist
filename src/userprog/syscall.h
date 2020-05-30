@@ -4,7 +4,9 @@
 #include "threads/thread.h"
 
 void syscall_init (void);
-void check_address(void *addr);
+struct vm_entry* check_address(void *addr, void* esp);
+void check_valid_buffer (void* buffer, unsigned size, void* esp, bool to_write);
+void check_valid_string (const void* str, void* esp);
 void get_argument(void *esp, int *arg , int count);
 
 /* filesystem lock */
