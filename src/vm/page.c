@@ -59,7 +59,7 @@ bool insert_vme (struct hash *vm, struct vm_entry *vme)
 	ASSERT(vme!=NULL);
 
 	/*hash_insert return NULL when it success*/
-	if(hash_insert(vm,&(vme->elem))==NULL)
+	if(hash_insert(vm,&vme->elem)==NULL)
 		return true;   //if success, return true
 	return false;
 }
@@ -70,8 +70,9 @@ bool delete_vme (struct hash *vm, struct vm_entry *vme)
 	ASSERT(vme!=NULL);
 
 	/*delete vme from vm*/
-	if(hash_delete(vm,&(vme->elem))==NULL) //if fail, return false
+	if(hash_delete(vm,&vme->elem)==NULL) //if fail, return false
 		return false;
+	//palloc_free_page(vme);
 	free(vme);
 	return true;
 }

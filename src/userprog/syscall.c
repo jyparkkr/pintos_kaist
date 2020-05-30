@@ -38,12 +38,15 @@ struct vm_entry* check_address(void *addr, void* esp UNUSED){
 void check_valid_buffer (void *buffer, unsigned size, void *esp, bool to_write) { 
 	struct vm_entry *vme;
 	unsigned check =0;
-/* size from buffer to buffer + size can be bigger than the size of one page*/
-/*  So we should check vm_entries that included in the address from buffer to buffer + size */
+	/* size from buffer to buffer + size can be bigger than the size of one page*/
+	vme=check_address(buffer, esp);
+	if(vme==NULL)
+		exit(-1);
+	/*  So we should check vm_entries that included in the address from buffer to buffer + size */
 	while(check<size){
-/* check if the address is valid and get vm_entry structure by check_address*/
+		/* check if the address is valid and get vm_entry structure by check_address*/
 		vme=check_address(buffer, esp);
-/*check the existence of vm_entry for that address and if vm_entry->writable is true*/
+		/*check the existence of vm_entry for that address and if vm_entry->writable is true*/
 		if(vme!=NULL)
 			if(to_write == true && vme->writable==false)
 				exit(-1);
@@ -54,12 +57,16 @@ void check_valid_buffer (void *buffer, unsigned size, void *esp, bool to_write) 
 }
 
 void check_valid_string (const void *str, void *esp) { 
-/* str에 대한 vm_entry의 존재 여부를 확인*/
- /* check_address()사용*/ 
+/* check the existence of vm_entry about to str*/
+ /* Use check_address()*/ 
 	int count=0;
-	while((char*)str != 0)
+	//printf("%s\n",*(char*)str);
+	check_address((void*)str, esp);
+	while(*(char*)str != NULL)
 	{
+    	//printf("open1.2\n");
 		check_address((void*)str, esp);
+    	//printf("open1.6\n");
 		str ++;
 		count++;
 	}
@@ -119,18 +126,18 @@ syscall_handler (struct intr_frame *f)
     	case SYS_CREATE: 
     		get_argument(sp,arg,2);
     		check_address((void*)arg[0],f->esp);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]),f->esp);
     		f -> eax = create((const char*)arg[0],(unsigned)arg[1]);
 			break;                   
     	case SYS_REMOVE:
     		get_argument(sp,arg,1);
     		check_address((void*)arg[0],f->esp);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]),f->esp);
     		f -> eax = remove((const char*)arg[0]);
 			break;                     
     	case SYS_OPEN: 
     		get_argument(sp,arg,1);
+    		//printf("open1\n");
     		check_valid_string((const void *)arg[0], f->esp);
+    		//printf("open2\n");
     		f -> eax = open((const char*)arg[0]);
 			break;                      
     	case SYS_FILESIZE:  
@@ -151,11 +158,13 @@ syscall_handler (struct intr_frame *f)
     	case SYS_WRITE: 
     		get_argument(sp,arg,3);
     		check_valid_buffer((void *)arg[1], (unsigned)arg[2], f->esp, false);
+    		//printf("after buffer check write!!\n");
     		/*for(check=0;check<(signed)arg[2];check++){
     			if(!put_user((void*)arg[1]+check,0))
     				exit(-1);
     		}*/
     		f -> eax = write(arg[0],(void*)arg[1], (unsigned)arg[2]);  
+    		//printf("after loading!!\n");
 			break;                 
     	case SYS_SEEK:  
     		get_argument(sp,arg,2);
@@ -169,8 +178,9 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,1);
     		close(arg[0]);
 			break;  
-		/*default:
-			exit(-1);*/
+		default: 
+			thread_exit ();
+
  	}
 }
 

@@ -148,17 +148,19 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+  //printf("came here\n");
  
   struct vm_entry *vme;
-  if (!not_present)
+  /* if it is not an approach for read only page (use not_present)*/ 
+  if (not_present==false)
     exit (-1);
+  /* search vm_entry structure about page fault address */ 
   vme = find_vme (fault_addr);
-  if(vme!=NULL)
-    if(!handle_mm_fault (vme))
-      exit(-1);
-  /* read only 페이지에 대한 접근이 아닐 경우 (not_present 참조)*/ 
-  /* 페이지 폴트가 일어난 주소에 대한 vm_entry 구조체 탐색 */ 
-  /* vm_entry를 인자로 넘겨주며 handle_mm_fault() 호출 */
-/* 제대로 파일이 물리 메모리에 로드 되고 맵핑 됬는지 검사 */
+  if(!vme)
+    exit(-1);
+   
+  /*call handle_mm_fault() with vm_entry factor and check if everything ok*/
+  if(handle_mm_fault (vme)==false)
+    exit(-1);  
 }
 

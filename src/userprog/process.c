@@ -136,7 +136,7 @@ start_process (void *file_name_)
   }
 
   /*initialize hash table using vm_init()*/
-  vm_init(&(thread_current()->vm));
+  vm_init(&thread_current()->vm);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -206,30 +206,34 @@ remove_child_process (struct thread *cp)
 }
 
 bool handle_mm_fault (struct vm_entry *vme) { 
-/* palloc_get_page()를이용해서 물리메모리 할당 */ 
+/*allocate physical memory using palloc_get_page()*/ 
   void* kaddr = palloc_get_page(PAL_USER);
-/* switch문으로 vm_entry의 타입별 처리 (VM_BIN외의 나머지 타입은 mmf 와 swapping에서 다룸*/ 
-  switch(vme->type){
-    /* VM_BIN일 경우 load_file()함수를 이용해서 물리메모리에 로드 */
-    case VM_BIN:
-      if(load_file(kaddr,vme) == false)
-      {
-        palloc_free_page(kaddr);
-        return false;
-      }
-      break;
-    case VM_FILE:
-      return false;
-    case VM_ANON:
-      return false;
-  }
- /* install_page를 이용해서 물리페이지와 가상페이지 맵핑 */
-  if(install_page(vme->vaddr,kaddr, vme->writable) == false){
-    palloc_free_page(kaddr);
+  if(!kaddr)
     return false;
+  bool success = false;
+  
+/* Deal with various type of vm_entry using switch*/ 
+  switch(vme->type){
+    /* if VM_BIN, load on physical memory using load_file()*/
+    case VM_BIN:
+    success = load_file(kaddr,vme);
+    break;
+
+    case VM_FILE:
+    break;
+
+    case VM_ANON:
+    break;
+
+    default:
+    break;
   }
-  /* 로드 성공 여부 반환 */ 
-  return true;
+  /*map physical page and virtual page using install_page */
+  if(success)
+    success = install_page(vme->vaddr,kaddr, vme->writable);
+ 
+  /* load success*/ 
+  return success;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -632,43 +636,44 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
-    {
+  {
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
-      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* vm_entry 생성 (malloc 사용) */
-      struct vm_entry *vme = (struct vm_entry *)malloc(sizeof (struct vm_entry));
-      if(vme == NULL)
-        return false;
-      /* vm_entry 멤버들 설정, 가상페이지가 요구될 때 읽어야할 파일의 오프
-      셋과 사이즈, 마지막에 패딩할 제로 바이트 등등 */
+    /* create vm_entry using malloc */
+    struct vm_entry *vme = (struct vm_entry *)malloc(sizeof (struct vm_entry));
+    if(vme == NULL)
+      return false;
 
-      memset (vme, 0, sizeof (struct vm_entry));
-      vme->type = VM_BIN;
-      vme->vaddr = upage;
-      vme->writable    = writable;
+    /* Set vm_entry members, offset and size to read when virtual page required
+    zero bytes for padding at last, etc*/
 
-      vme->file = file;
+    memset (vme, 0, sizeof (struct vm_entry));
+    vme->type = VM_BIN;
+    vme->vaddr = upage;
+    vme->writable    = writable;
 
-      vme->offset = ofs;
-      vme->read_bytes = page_read_bytes;
-      vme->zero_bytes = page_zero_bytes;
+    //vme->is_loaded = 
+    vme->file = file;
 
-      /* insert_vme() 함수를 사용해서 생성한 vm_entry를 해시테이블에 추
-         가 */
-      if(insert_vme(&thread_current()->vm, vme) == false ){
-        free(vme);
-        return false;
-  }
+    vme->offset = ofs;
+    vme->read_bytes = page_read_bytes;
+    vme->zero_bytes = page_zero_bytes;
 
-  /* Advance. */
-  read_bytes -= page_read_bytes;
-  zero_bytes -= page_zero_bytes;
-  ofs += page_read_bytes;
-  upage += PGSIZE;
+    /* insert vm_entry created into hashtable using insert_vme() function*/
+    if(insert_vme(&thread_current()->vm, vme) == false ){
+      free(vme);
+      return false;
+    }
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    ofs += page_read_bytes;
+    upage += PGSIZE;
   }
   return true;
 }
@@ -692,18 +697,28 @@ setup_stack (void **esp)
         palloc_free_page (kpage);
     }
 
-  struct vm_entry *vme = (struct vm_entry *)malloc(sizeof(struct vm_entry));
-  if (vme == NULL)
-    return false;
+  /* create vm_entry using malloc */
+    struct vm_entry *vme = (struct vm_entry *)malloc(sizeof (struct vm_entry));
+    if(vme == NULL)
+      return false;
 
-   /* initialize vm_entry */
-  memset (vme, 0, sizeof (struct vm_entry));
-  vme->is_loaded = true;
-  vme->writable = true;
-  vme->type = VM_ANON;
+    /* Set vm_entry members, offset and size to read when virtual page required
+    zero bytes for padding at last, etc*/
+    
+    memset (vme, 0, sizeof (struct vm_entry));
+    vme->type = VM_ANON;
+    vme->writable = true;
+    vme->is_loaded = true;
+    vme->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  
+    /* insert vm_entry. if fail, return false*/
+    success = insert_vme(&thread_current()->vm, vme);
 
-  /* insert vm_entry. if fail, return false*/
-  success = insert_vme(&thread_current()->vm, vme);
+    /* insert vm_entry created into hashtable using insert_vme() function*/
+    if(success == false ){
+      free(vme);
+      return false;
+    }
 
   return success;
 }
