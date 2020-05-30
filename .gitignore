@@ -7,6 +7,8 @@
 **/.vscode/
 **/.vscode
 
+**/build/
+
 #cscope
 */cscope.files
 */cscope.out
@@ -25,3 +27,4 @@ src/Make.config
 src/devices/shutdown.c
 
 
+src/Makefile.userprog

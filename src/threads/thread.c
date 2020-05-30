@@ -255,11 +255,7 @@ thread_create (const char *name, int priority,
   /* compare the priorities of the currently running thread 
      and the newly inserted one. Yield the CPU if the newly 
      arriving thread has higher priority*/
-  struct thread *cur_t = thread_current();
-  if(cur_t->priority < t->priority){
-    thread_yield();
-  }
-
+  test_max_priority();
   return tid;
 }
 
@@ -470,11 +466,14 @@ thread_get_priority (void)
  If current thread has smaller priority, current thread yield*/
 void test_max_priority (void){
   if (!list_empty (&ready_list)){
-    struct list_elem *e;
-    e=list_begin(&ready_list);
-    struct thread *t = list_entry(e, struct thread, elem);
-    if(thread_get_priority()<t->priority){
-      thread_yield();
+    struct thread *t = list_entry (list_begin(&ready_list), struct thread, elem);
+    if(thread_get_priority() < t->priority){
+      if(intr_context()){
+        printf("changed\n");
+        intr_yield_on_return();
+      } else{
+        thread_yield();
+      }
     }
   }
 }
