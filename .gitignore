@@ -20,8 +20,3 @@
 **/*.result
 **/*.o
 
-src/utils/
-src/Make.config
-src/devices/shutdown.c
-
-
