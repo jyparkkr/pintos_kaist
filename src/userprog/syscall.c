@@ -11,6 +11,7 @@
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "filesys/off_t.h"
+#include "vm/page.h"
 
 
 
@@ -135,6 +136,17 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,1);
     		close(arg[0]);
 			break;  
+		case SYS_MMAP:
+    		get_argument(sp,arg,2);
+    		check_address((void*)arg[1]);
+    		check_address((void*)arg[1]+strlen((char*)arg[1]));
+    		f -> eax = mmap((int)arg[0],(void *)arg[1]);
+			break;
+		case SYS_MUNMAP:
+    		get_argument(sp,arg,1);
+    		check_address((void*)arg[0]);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+			break;
 		/*default:
 			exit(-1);*/
  	}
@@ -263,6 +275,81 @@ int write(int fd, void *buffer, unsigned size) {
 	lock_release(&filesys_lock);
 	return size_write;
 }
+
+/* memory_mapping */
+mapid_t mmap (int fd, void *addr)
+{
+	if (addr == NULL || pg_ofs(addr) != 0 || !is_user_vaddr(addr))
+		return MAPID_ERROR;
+
+	/* initialize mem_file */
+	struct mmap_file *mem_file;
+	mem_file = (struct mmap_file *) malloc (sizeof (struct mmap_file));
+	if (mem_file == NULL)
+		return MAPID_ERROR;
+	
+	memset (mem_file, 0, sizeof (struct mmap_file));
+	mem_file->mapid = thread_current()->next_mapid++;
+	struct file *file_from_fd = process_get_file(fd);
+	if (file_from_fd == NULL)
+		return MAPID_ERROR;
+	mem_file->file = file_reopen(file_from_fd);
+	list_init(&mem_file->vme_list);
+	list_push_back(&thread_current()->mmap_list, &mem_file->elem);
+
+	/* vm_entry init */
+	int remain_len;
+	size_t offset = 0;
+	remain_len = file_length(mem_file->file);
+	while(remain_len > 0)
+	{
+		if(find_vme(addr)) //double vme
+			return -1;
+		
+		struct vm_entry *vme;
+		vme = (struct vm_entry *) malloc (sizeof (struct vm_entry));
+		if (vme == NULL)
+			return MAPID_ERROR;
+		
+		memset (vme, 0, sizeof (struct vm_entry));
+		vme->type = VM_FILE;
+		vme->vaddr = addr;
+		vme->writable = true;
+
+		//vme->is_loaded = 1;
+		vme->file = mem_file->file;
+		list_push_back(&mem_file->vme_list, &vme->mmap_elem);
+
+		vme->offset = offset;
+		vme->read_bytes = PGSIZE > remain_len ? remain_len : PGSIZE;
+		vme->zero_bytes = PGSIZE > remain_len ? PGSIZE - remain_len : 0;
+
+		// vme->swap_slot = ; will be used in swap slot
+		insert_vme(&thread_current()->vm, vme);
+
+		addr += PGSIZE;
+		offset += PGSIZE;
+		remain_len -= PGSIZE;
+	}
+	return mem_file->mapid;
+}
+
+void munmap (mapid_t mapping)
+{
+	struct list_elem *e;
+	struct list *mmap_list;
+	mmap_list = &thread_current()->mmap_list;
+	for (e = list_begin (mmap_list); e != list_end (mmap_list);
+		e = list_next (e))
+	{
+		struct mmap_file *mm = list_entry (e, struct mmap_file, elem);
+		if (mm->mapid == mapping)
+			do_munmap(mm);
+	}
+	/* what if mapid is CLOSE_ALL */
+
+}
+
 void seek (int fd, unsigned position) { 
 		/* search file using file director*/ 
 	struct file *searching_file = process_get_file(fd);
@@ -279,3 +366,4 @@ void close (int fd) {
 	/* close file of fd and initiallize the fd entry */ 
 	process_close_file(fd);  
 } 
+

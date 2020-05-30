@@ -250,6 +250,12 @@ thread_create (const char *name, int priority,
   /* init fd */
   t->fd_max = 2;
   t->fd_table = palloc_get_page(PAL_ZERO);
+
+  /* Initialize mmap_list & max_mapid */
+  list_init(&t->mmap_list);
+  t->next_mapid = 0;
+
+
   /* Add to run queue. */
   thread_unblock (t);
   

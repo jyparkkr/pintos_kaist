@@ -250,6 +250,12 @@ process_exit (void)
   /* free fd_table */
   palloc_free_page(cur->fd_table);
 
+  /* clean vm entry and mmap_file */
+  mapid_t mapid;
+  struct mmap_file *mem_file;
+  for (mapid = 0;mapid < cur->next_mapid;mapid++)
+    munmap(mapid);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -670,4 +676,30 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+
+/* project3 - memory mapped file */
+/* remove mapping of file from memory */ 
+void do_munmap (struct mmap_file* map_file)
+{
+	struct list_elem *e;
+	for (e = list_begin (&map_file->vme_list); e != list_end (&map_file->vme_list);
+		e = list_next (e))
+	{
+		struct vm_entry *vme = list_entry (e, struct vm_entry, mmap_elem);
+    /* update disk */
+    if (pagedir_is_dirty(thread_current()->pagedir, vme->addr) || vme->is_loaded)
+    {
+      file_write_at(vme->file, vme->vaddr, vme->read_bytes, vme->offset);
+      /* clean page table entry */
+      // free_page_vaddr(vme->vaddr);
+    }
+    /* remove */
+    vme->is_loaded = false;
+    list_remove(e);
+    delete_vme(&thread_current()->vm, vme); //containing free
+	}
+  list_remove(&map_file->elem);
+  free(map_file);
 }
