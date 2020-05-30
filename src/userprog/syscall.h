@@ -21,6 +21,8 @@ int open(const char *file);
 int filesize (int fd);
 int read (int fd, void *buffer, unsigned size);
 int write(int fd, void *buffer, unsigned size);
+mapid_t mmap (int fd, void *addr);
+void munmap (mapid_t mapping);
 void seek (int fd, unsigned position);
 unsigned tell (int fd); 
 void close (int fd);

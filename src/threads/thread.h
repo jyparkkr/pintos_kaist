@@ -21,7 +21,9 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+typedef int mapid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+#define MAPID_ERROR ((mapid_t) -1)
 
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
@@ -143,6 +145,10 @@ struct thread
     int fd_max;                      /*maximum fd value exists on current table*/
     /* denying write to executable */
     struct file *cur_file;           /* current running file */
+
+    /* pj3 - Memory mapped file */
+    struct list mmap_list;          /* mmap list of opened file */
+    mapid_t next_mapid;             /* first value is 0 for convinence */
   };
 
 /* If false (default), use round-robin scheduler.
