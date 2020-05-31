@@ -12,6 +12,7 @@
 #include "devices/input.h"
 #include "filesys/off_t.h"
 #include "vm/page.h"
+#include "threads/malloc.h"
 
 
 static void syscall_handler (struct intr_frame *);
@@ -180,14 +181,11 @@ syscall_handler (struct intr_frame *f)
 			break;  
 		case SYS_MMAP:
     		get_argument(sp,arg,2);
-    		check_address((void*)arg[1], f->esp);
-    		check_address((void*)arg[1]+strlen((char*)arg[1]), f->esp);
     		f -> eax = mmap((int)arg[0],(void *)arg[1]);
 			break;
 		case SYS_MUNMAP:
     		get_argument(sp,arg,1);
-    		check_address((void*)arg[0], f->esp);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]), f->esp);
+			munmap((mapid_t) arg[0]);
 			break;
 		default: 
 			thread_exit ();
@@ -276,7 +274,6 @@ mapid_t mmap (int fd, void *addr)
 
 		// vme->swap_slot = ; will be used in swap slot
 		insert_vme(&thread_current()->vm, vme);
-
 		addr += PGSIZE;
 		offset += PGSIZE;
 		remain_len -= PGSIZE;
@@ -295,9 +292,9 @@ void munmap (mapid_t mapping)
 		struct mmap_file *mm = list_entry (e, struct mmap_file, elem);
 		if (mm->mapid == mapping)
 			do_munmap(mm);
+			return;
 	}
 	/* what if mapid is CLOSE_ALL */
-
 }
 
 int wait (tid_t tid){

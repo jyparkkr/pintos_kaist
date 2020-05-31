@@ -34,9 +34,9 @@ struct vm_entry{
 
 struct mmap_file {
     int mapid;
-    struct file* file;
-    struct list_elem elem;
-    struct list vme_list;
+    struct file* file;		/* file pointer in mem */
+    struct list_elem elem;	/* for thread's mmap_list */
+    struct list vme_list;	/* its vm entry list */
 };
 
 void vm_init (struct hash *vm);

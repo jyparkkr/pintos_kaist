@@ -18,7 +18,6 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
-#include "vm/page.h"
 #include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
@@ -216,10 +215,14 @@ bool handle_mm_fault (struct vm_entry *vme) {
   switch(vme->type){
     /* if VM_BIN, load on physical memory using load_file()*/
     case VM_BIN:
-    success = load_file(kaddr,vme);
+      success = load_file(kaddr,vme);
+      vme->is_loaded = true;
     break;
 
     case VM_FILE:
+      success = load_file(kaddr, vme);
+      vme->is_loaded = true;
+      //free_page_kaddr (kpage);
     break;
 
     case VM_ANON:
@@ -290,7 +293,6 @@ process_exit (void)
 
   /* clean vm entry and mmap_file */
   mapid_t mapid;
-  struct mmap_file *mem_file;
   for (mapid = 0;mapid < cur->next_mapid;mapid++)
     munmap(mapid);
   
@@ -753,12 +755,11 @@ install_page (void *upage, void *kpage, bool writable)
 void do_munmap (struct mmap_file* map_file)
 {
 	struct list_elem *e;
-	for (e = list_begin (&map_file->vme_list); e != list_end (&map_file->vme_list);
-		e = list_next (e))
+	for (e = list_begin (&map_file->vme_list); e != list_end (&map_file->vme_list);)
 	{
 		struct vm_entry *vme = list_entry (e, struct vm_entry, mmap_elem);
     /* update disk */
-    if (pagedir_is_dirty(thread_current()->pagedir, vme->vaddr) || vme->is_loaded)
+    if (pagedir_is_dirty(thread_current()->pagedir, vme->vaddr) && vme->is_loaded)
     {
       file_write_at(vme->file, vme->vaddr, vme->read_bytes, vme->offset);
       /* clean page table entry */
@@ -766,7 +767,7 @@ void do_munmap (struct mmap_file* map_file)
     }
     /* remove */
     vme->is_loaded = false;
-    list_remove(e);
+    e = list_remove(e);
     delete_vme(&thread_current()->vm, vme); //containing free
 	}
   list_remove(&map_file->elem);
