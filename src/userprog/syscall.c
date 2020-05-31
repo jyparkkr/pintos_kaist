@@ -272,7 +272,7 @@ mapid_t mmap (int fd, void *addr)
 		vme->read_bytes = PGSIZE > remain_len ? remain_len : PGSIZE;
 		vme->zero_bytes = PGSIZE > remain_len ? PGSIZE - remain_len : 0;
 
-		// vme->swap_slot = ; will be used in swap slot
+		// vme->swap_slot = ; will be implement in swap slot
 		insert_vme(&thread_current()->vm, vme);
 		addr += PGSIZE;
 		offset += PGSIZE;
@@ -292,7 +292,7 @@ void munmap (mapid_t mapping)
 		struct mmap_file *mm = list_entry (e, struct mmap_file, elem);
 		if (mm->mapid == mapping)
 			do_munmap(mm);
-			return;
+			return; //no double vme
 	}
 	/* what if mapid is CLOSE_ALL */
 }
