@@ -19,6 +19,8 @@
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
 #include "threads/malloc.h"
+#include "vm/page.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -204,23 +206,26 @@ remove_child_process (struct thread *cp)
   }
 }
 
-bool handle_mm_fault (struct vm_entry *vme) { 
+bool handle_mm_fault (struct vm_entry *vme) 
 /*allocate physical memory using palloc_get_page()*/ 
-  void* kaddr = palloc_get_page(PAL_USER);
-  if(!kaddr)
+{ 
+  struct page *kpage;
+  kpage = alloc_page(PAL_USER);
+  if(!kpage)
     return false;
+  kpage->vme = vme;
   bool success = false;
   
 /* Deal with various type of vm_entry using switch*/ 
   switch(vme->type){
     /* if VM_BIN, load on physical memory using load_file()*/
     case VM_BIN:
-      success = load_file(kaddr,vme);
+      success = load_file(kpage->kaddr, vme);
       vme->is_loaded = true;
     break;
 
     case VM_FILE:
-      success = load_file(kaddr, vme);
+      success = load_file(kpage->kaddr, vme);
       vme->is_loaded = true;
       //free_page_kaddr (kpage);
     break;
@@ -233,8 +238,10 @@ bool handle_mm_fault (struct vm_entry *vme) {
   }
   /*map physical page and virtual page using install_page */
   if(success)
-    success = install_page(vme->vaddr,kaddr, vme->writable);
- 
+    success = install_page(vme->vaddr,kpage->kaddr, vme->writable);
+  else
+    free_page(kpage->kaddr);
+  
   /* load success*/ 
   return success;
 }
@@ -690,43 +697,39 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+  struct page *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  //kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = alloc_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-        //*esp = PHYS_BASE - 12;
-      else
-        palloc_free_page (kpage);
-    }
-
-  /* create vm_entry using malloc */
-    struct vm_entry *vme = (struct vm_entry *)malloc(sizeof (struct vm_entry));
-    if(vme == NULL)
+  {
+    struct vm_entry *vme;
+    vme = (struct vm_entry *) malloc (sizeof(struct vm_entry));
+    if (vme == NULL) //malloc failure
       return false;
-
     /* Set vm_entry members, offset and size to read when virtual page required
     zero bytes for padding at last, etc*/
-    
     memset (vme, 0, sizeof (struct vm_entry));
+    success = insert_vme(&thread_current()->vm, vme);
     vme->type = VM_ANON;
     vme->writable = true;
     vme->is_loaded = true;
     vme->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  
-    /* insert vm_entry. if fail, return false*/
-    success = insert_vme(&thread_current()->vm, vme);
+    /* insermt vm_entry. if fail, return false*/
 
-    /* insert vm_entry created into hashtable using insert_vme() function*/
-    if(success == false ){
-      free(vme);
-      return false;
+    kpage->vme = vme;
+    //kpage->thread = thread_current();
+    add_page_to_lru_list(kpage);
+    success &= install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+    if (success)
+      *esp = PHYS_BASE;
+      //*esp = PHYS_BASE - 12;
+    else{
+      free_page (kpage);
+      free (vme);
     }
-
+  }
   return success;
 }
 
@@ -759,11 +762,18 @@ void do_munmap (struct mmap_file* map_file)
 	{
 		struct vm_entry *vme = list_entry (e, struct vm_entry, mmap_elem);
     /* update disk */
-    if (pagedir_is_dirty(thread_current()->pagedir, vme->vaddr) && vme->is_loaded)
+    if (vme->is_loaded)
     {
-      file_write_at(vme->file, vme->vaddr, vme->read_bytes, vme->offset);
+      if (pagedir_is_dirty(thread_current()->pagedir, vme->vaddr))
+      {
+        lock_acquire(&filesys_lock);
+        file_write_at(vme->file, vme->vaddr, vme->read_bytes, vme->offset);
+        lock_release(&filesys_lock);
+      }
       /* clean page table entry */
-      // free_page_vaddr(vme->vaddr);
+      void *kaddr; //physical addr
+      kaddr = pagedir_get_page (thread_current()->pagedir, vme->vaddr);
+      free_page(kaddr);
     }
     /* remove */
     vme->is_loaded = false;

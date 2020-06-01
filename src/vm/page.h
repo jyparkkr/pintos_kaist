@@ -1,10 +1,11 @@
 #ifndef __VIM_PAGEH_H
 #define __VIM_PAGEH_H
 
-#include "list.h"
-#include "hash.h"
+#include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include <debug.h>
+#include "threads/palloc.h"
 
 #define VM_BIN 0
 #define VM_FILE 1
@@ -39,6 +40,13 @@ struct mmap_file {
     struct list vme_list;	/* its vm entry list */
 };
 
+struct page {
+	void *kaddr;			/* physical addr of page */
+	struct vm_entry *vme;	/* points vm_entry linked with physical page */
+	struct thread *thread;	/* points thread_current */
+	struct list_elem lru;	/* for connection with lru_list */
+};
+
 void vm_init (struct hash *vm);
 bool insert_vme (struct hash *vm, struct vm_entry *vme);
 bool delete_vme (struct hash *vm, struct vm_entry *vme);
@@ -46,4 +54,7 @@ struct vm_entry *find_vme (void *vaddr);
 void vm_destroy (struct hash *vm);
 bool load_file (void* kaddr, struct vm_entry *vme);
 
+struct page* alloc_page (enum palloc_flags flags);
+void free_page (void *kaddr);
+void __free_page (struct page* page);
 #endif

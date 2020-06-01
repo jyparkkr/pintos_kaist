@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
 #include <string.h>
+#include "vm/frame.h"
 
 
 static unsigned vm_hash_func (const struct hash_elem *e, void *aux UNUSED);
@@ -109,3 +110,46 @@ bool load_file (void* kaddr, struct vm_entry *vme){
 	} 
 	return false;
 }
+
+/* allocate page and add on LRU list */
+struct page* alloc_page (enum palloc_flags flags)
+{
+	struct page *page;
+	page = (struct page *) malloc (sizeof(struct page));
+	if (page == NULL) //malloc failure
+		return NULL;
+	memset (page, 0, sizeof (struct page));
+
+	page->kaddr = palloc_get_page(flags);
+	while (!page->kaddr)
+	{
+		try_to_free_pages(flags);
+		page->kaddr = palloc_get_page(flags);
+	}
+	page->thread = thread_current();
+	add_page_to_lru_list(page);
+	//page->vme on handle_mm_fault of process.c
+	return page;
+}
+
+/* find page from lru list to free */
+void free_page (void *kaddr)
+{
+	struct page *pg;
+	lock_acquire(&lru_list_lock);
+	pg = find_page_from_lru_list (kaddr);
+	if (!pg) //try to free kaddr not on lru_list
+		return;
+	__free_page(pg);
+	lock_release(&lru_list_lock);
+}
+
+/* remove from LRU list & free */
+void __free_page (struct page* page)
+{
+	del_page_from_lru_list (page);
+	palloc_free_page (page->kaddr);
+	pagedir_clear_page(page->thread->pagedir, page->vme->vaddr);
+	free(page);
+}
+
