@@ -32,7 +32,7 @@ void swap_in (size_t used_index, void* kaddr)
     for (idx=0;idx<total_idx;idx++)
         block_read(swap_slot, used_index * total_idx + idx,\
          kaddr + idx * BLOCK_SECTOR_SIZE);
-    bitmap_set_multiple(swap_slot, used_index, 1, false);
+    bitmap_set_multiple(swap_bitmap, used_index, 1, false);
     lock_release(&swap_lock);
 }
 
@@ -51,4 +51,5 @@ size_t swap_out (void* kaddr)
         block_write(swap_slot, swap_idx * total_idx + idx,\
          kaddr + idx * BLOCK_SECTOR_SIZE);
     lock_release(&swap_lock);
+    return swap_idx;
 }
