@@ -1,0 +1,155 @@
++-------------------------+
+|          EE 415         |
+|         PROJECT 3       |
+|      DESIGN DOCUMENT    |
++-------------------------+
+
+---- GROUP ----
+
+20170088 김문성 ms721@kaist.ac.kr
+20170276 박재영 jypark_korea@kaist.ac.kr
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for
+>> the TAs, or extra credit, please give them here.
+
+No comments
+
+>> Please cite any oﬄine or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation,
+>> course text, and lecture notes.
+
+Lecture note of Pintos Project Slide Set in https://oslab.kaist.ac.kr/ee415-spring-2020/.
+
+
+vm_entry
+=========
+
+
+---- DATA STRUCTURES ----
+
+>>new or changed 'struct'
+
+We newly made two files pintos_kaist/src/vm/page.h, pintos_kaist/src/vm/page.c
+In pintos/src/vm/page.h, there is newly made struct vm_entry
+which is composed with below.
+    
+struct vm_entry{
+	uint8_t type; /* type for VM_BIN, VM_FILE, VM_ANON */
+	void *vaddr; /* virtual page number that vm_entry manages*/
+	bool writable; /* If True writable on corresponding address, If false not*/
+
+	bool is_loaded; /* flag that tells us if is_loaded on physical memory */
+	struct file* file; /* file that is mapped with virtual address */
+	
+	/* Will be used at Memory Mapped File*/
+	struct list_elem mmap_elem; /* mmap list element */
+	
+	size_t offset; /* offset of file that will read*/
+	size_t read_bytes; /* data size written on virtual page */
+	size_t zero_bytes; /* left bytes that will be filled with 0*/
+	
+	/* Will be used on Swapping*/
+	size_t swap_slot; /* swap slot */
+
+	/* Will be used on ‘struct for vm_entries’*/
+	struct hash_elem elem; /* hash table Element */
+};
+
+There is also a change at struct thread in pintos_kaist/src/threads/thread.h
+/*For pj3 virtual memory*/
+struct hash vm; /* Hashtable for virtual address space that thread owns*/
+added.
+
+
+---- ALGORITHMS ----
+
+>> Brieﬂy describe your implementation of vm_entry
+
+Every pages will have one vm_entry.
+It saves file pointer, offset, size of each page.
+When first load the program, allocate vm_entry on each page of virtual address space
+When run program
+->search the page table
+->when page fault occurs, search vm_entry correspond to virtual address
+--->If virtual address not in vm_entry, Segmentation fault
+--->If vm_entry exist
+----->allocate page frame
+----->load page refer to the file pointer, offset, size and so on in the vm_entry
+----->update page table
+
+Also made many functions that deal with vm_entries.
+void vm_init (struct hash *vm);   //initializes hash table vm
+bool insert_vme (struct hash *vm, struct vm_entry *vme); //insert vme into vm
+bool delete_vme (struct hash *vm, struct vm_entry *vme); //delete vme from vm
+struct vm_entry *find_vme (void *vaddr); //find vm_entry using address *vaddr
+void vm_destroy (struct hash *vm); // destroy hashtable vm
+
+
+
+Demand paging
+=============
+
+---- ALGORITHMS ----
+
+
+>> Brieﬂy describe your implementation of vm_entry
+
+1. 
+In pintos_kaist/src/userprog/process.c there is 
+static bool
+load_segment (struct file *file, off_t ofs, uint8_t *upage,
+              uint32_t read_bytes, uint32_t zero_bytes, bool writable)
+Here, loading segment of ELF format file on process virtual address space take place.
+This is modified.
+The part loading memory on virtual address space deleted.
+Instead, vm_entry initializing is added.
+allocate vm_entry structure, initialize field values, insert vm_entry to hashtable.
+
+
+2. 
+In pintos_kaist/src/userprog/process.c there is
+static bool setup_stack (void **esp)
+
+There are some functionalities added.
+create 4KB vm_entry
+initialize the field values of created vm_entry
+insert to hashtable vm
+
+
+3.
+In pintos_kaist/src/userprog/syscall.c
+There are functions for checking validity.
+When checking, it previously just checked the validity of address.
+From now on, chaged check_address function and 
+added check_string, check_buffer function will check more deeply.
+Even the address is valid, we will check whether vm_entry correspond to the address/buffer/string exist.
+
+
+4.
+In pintos_kaist/src/userprog/exception.c
+There is static void page_fault (struct intr_frame *f) which manages page fault.
+Previously, segmentation fault occurs and kill(-1) the process 
+if there is an error on permission and address validity test.
+From now on, if the addr is valid, search for vm_entry.
+If there is, allocate pages, load from file to physical memory, set up page table 
+
+
+5.
+The process of allocate pages, load from file to physical memory, set up page table takes place by
+bool handle_mm_fault (struct vm_entry *vme)  in pintos_kaist/src/userprog/process.c
+This is newly added function. If handle_mm_fault is called,
+first allocate physical memory, manage vm_entry by its type using switch case.
+If type is VM_BIN, load to physical memory by 
+bool load_file (void* kaddr, struct vm_entry *vme) in pintos_kaist/src/vm/page.c .
+Then, map physical page and virtual page 
+by static bool
+install_page (void *upage, void *kpage, bool writable) in pintos_kaist/src/userprog/process.c
+
+
+---- RATIONALE ----
+
+every test passed related to Demanding pages.
+I tested by make check on pintos_kaist/src/vm.
+The result was 28 of 109 tests failed, which is the same value with lab pdf.
