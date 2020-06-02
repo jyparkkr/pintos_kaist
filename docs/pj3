@@ -154,3 +154,52 @@ install_page (void *upage, void *kpage, bool writable) in pintos_kaist/src/userp
 every test passed related to Demanding pages.
 I tested by make check on pintos_kaist/src/vm.
 The result was 28 of 109 tests failed, which is the same value with lab pdf.
+
+Memory Mapped File
+=============
+>> new or changed 'struct'
+1. For mapid, datatype(typedef int mapid_t) and macro (#define MAPID_ERROR) added
+2. In struct thread, mapid_t next_mapid is added. This starts from 0 and it implies next mapid number.
+3. struct mmap_file is added on page.h
+struct mmap_file {
+    int mapid;
+    struct file* file;		/* file pointer in mem */
+    struct list_elem elem;	/* for thread's mmap_list */
+    struct list vme_list;	/* its vm entry list */
+};
+
+
+>> Added global variables
+
+
+---- ALGORITHMS ----
+
+
+Swapping
+=============
+>> new or changed 'struct'
+1. size_t swap_slot was added on vm_entry to show its swapped entry on swap disk if it is swapped out.
+
+2. struct page  is added on page.h
+struct page {
+	void *kaddr;			/* physical addr of page */
+	struct vm_entry *vme;	/* points vm_entry linked with physical page */
+	struct thread *thread;	/* points thread_current */
+	struct list_elem lru;	/* for connection with lru_list */
+};
+
+
+
+>> Added global variables
+1. In frame.c global variables for swap policy was added.
+struct list lru_list;
+struct lock lru_list_lock;
+struct list_elem *lru_clock;
+was added on this feature.
+Although name of global variables include lru, its swapping policy I choose to use is clock algorithm.
+lru_clock is clock arm of this algorithm.
+
+2. size of swap slot (#define SWAP_SLOT_SIZE 4096)  is added on swap.c to calculate number of block sector
+needed for one swap slot and to calculate initial bitmap(for swap disk management) size.
+
+
