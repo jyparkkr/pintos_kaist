@@ -210,10 +210,9 @@ remove_child_process (struct thread *cp)
 bool handle_mm_fault (struct vm_entry *vme) 
 /*allocate physical memory using palloc_get_page()*/ 
 { 
-  if (vme->is_loaded) //existing page
-    return false;
-  struct page *kpage;
-  kpage = alloc_page(PAL_USER);
+  //if (vme->is_loaded)
+  //  return false;
+  struct page *kpage = alloc_page(PAL_USER);
   if(!kpage)
     return false;
   kpage->vme = vme;
@@ -228,7 +227,6 @@ bool handle_mm_fault (struct vm_entry *vme)
 
     case VM_FILE:
       success = load_file(kpage->kaddr, vme);
-      //free_page_kaddr (kpage);
     break;
 
     case VM_ANON:
@@ -242,14 +240,14 @@ bool handle_mm_fault (struct vm_entry *vme)
   /*map physical page and virtual page using install_page */
   if(success){
     success = install_page(vme->vaddr,kpage->kaddr, vme->writable);
-    if (!success){
-      free_page(kpage->kaddr);
+    if (success){
       vme->is_loaded = true;
     }
+    else
+      free_page(kpage->kaddr);
   }
   else
     free_page(kpage->kaddr);
-  
   /* load success*/ 
   return success;
 }

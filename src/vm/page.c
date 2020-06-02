@@ -139,6 +139,8 @@ struct page* alloc_page (enum palloc_flags flags)
 /* find page from lru list to free */
 void free_page (void *kaddr)
 {
+	if(kaddr == NULL)
+		return;
 	struct page *pg;
 	lock_acquire(&lru_list_lock);
 	pg = find_page_from_lru_list (kaddr);
