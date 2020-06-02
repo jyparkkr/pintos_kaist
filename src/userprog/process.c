@@ -221,24 +221,28 @@ bool handle_mm_fault (struct vm_entry *vme)
     /* if VM_BIN, load on physical memory using load_file()*/
     case VM_BIN:
       success = load_file(kpage->kaddr, vme);
-      vme->is_loaded = true;
     break;
 
     case VM_FILE:
       success = load_file(kpage->kaddr, vme);
-      vme->is_loaded = true;
       //free_page_kaddr (kpage);
     break;
 
     case VM_ANON:
+      swap_in (vme->swap_slot, kpage->kaddr);
+      success = true;
     break;
 
     default:
     break;
   }
   /*map physical page and virtual page using install_page */
-  if(success)
+  if(success){
     success = install_page(vme->vaddr,kpage->kaddr, vme->writable);
+    if (!success)
+      free_page(kpage->kaddr);
+    vme->is_loaded = true;
+  }
   else
     free_page(kpage->kaddr);
   
@@ -711,12 +715,12 @@ setup_stack (void **esp)
     /* Set vm_entry members, offset and size to read when virtual page required
     zero bytes for padding at last, etc*/
     memset (vme, 0, sizeof (struct vm_entry));
-    success = insert_vme(&kpage->thread->vm, vme);
     vme->type = VM_ANON;
     vme->writable = true;
     vme->is_loaded = true;
     vme->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
     /* insermt vm_entry. if fail, return false*/
+    success = insert_vme(&kpage->thread->vm, vme);
 
     kpage->vme = vme;
     //kpage->thread = thread_current();

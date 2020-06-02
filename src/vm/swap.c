@@ -26,6 +26,7 @@ void swap_init ()
 void swap_in (size_t used_index, void* kaddr)
 {
     lock_acquire(&swap_lock);
+    swap_slot = block_get_role(BLOCK_SWAP);
     int total_idx, idx;
     total_idx = SWAP_SLOT_SIZE / BLOCK_SECTOR_SIZE;
     for (idx=0;idx<total_idx;idx++)
@@ -39,11 +40,13 @@ void swap_in (size_t used_index, void* kaddr)
 size_t swap_out (void* kaddr)
 {
     lock_acquire(&swap_lock);
-
+    swap_slot = block_get_role(BLOCK_SWAP);
     size_t swap_idx;
     swap_idx = bitmap_scan_and_flip(swap_bitmap, 0, 1, false);
-    if(swap_idx == BITMAP_ERROR)
+    if(swap_idx == BITMAP_ERROR){
+        lock_release(&swap_lock);
         return BITMAP_ERROR;
+    }
     int total_idx, idx;
     total_idx = SWAP_SLOT_SIZE / BLOCK_SECTOR_SIZE;
     for (idx=0;idx<total_idx;idx++)

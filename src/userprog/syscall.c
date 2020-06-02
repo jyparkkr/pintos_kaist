@@ -33,7 +33,7 @@ struct vm_entry* check_address(void *addr, void* esp UNUSED){
 	/*find_vme() 사용*/
 	vme=find_vme(addr);
 	if(vme==NULL)
-		exit(-2);
+		exit(-1);
 	return vme;
 }
 void check_valid_buffer (void *buffer, unsigned size, void *esp, bool to_write) { 

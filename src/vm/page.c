@@ -139,7 +139,10 @@ void free_page (void *kaddr)
 	lock_acquire(&lru_list_lock);
 	pg = find_page_from_lru_list (kaddr);
 	if (!pg) //try to free kaddr not on lru_list
+	{
+		lock_release(&lru_list_lock);
 		return;
+	}
 	__free_page(pg);
 	lock_release(&lru_list_lock);
 }
@@ -147,6 +150,8 @@ void free_page (void *kaddr)
 /* remove from LRU list & free */
 void __free_page (struct page* page)
 {
+	ASSERT (page != NULL);
+	ASSERT (page->kaddr != NULL);
 	del_page_from_lru_list (page);
 	palloc_free_page (page->kaddr);
 	pagedir_clear_page(page->thread->pagedir, page->vme->vaddr);

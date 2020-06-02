@@ -4,3 +4,10 @@ swapping - try_to_free에서 palloc_free_page를 parameter로 받지만
 page에는 palloc_flags를 parameter로 가지는게 없어서 input에 따라 free하기도 어려울 뿐더러,
 실제로 allocate하는 page와 동일한 palloc_flags를 굳이 free해줄 필요 없을것 같아서 안썼는데,
 test에 문제가 없어서 그대로 뒀다.
+
+
+setup_stack 에서     success = insert_vme(&kpage->thread->vm, vme);
+의 위치가 중요했는데, struct vm_entry *find_vme (void *vaddr)
+에서 vme pointer가 아닌 그 자체를 정의하고 찾는것에서 intuition을 얻어서 위치를 바꿨더니 돌아감.
+
+swap에서 vulnerability: swap size를 받아오는 법이 안되서 알려준데로 4MB라 가정하고 함.
