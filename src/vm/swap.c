@@ -18,7 +18,7 @@ void swap_init ()
     int bitmap_size;
     /* bitmap size is
      disk_sector_num * 512B(disk sector size) / 4kB(swap slot size) */ 
-    bitmap_size = 4096 * 1024 / SWAP_SLOT_SIZE;
+    bitmap_size = block_size(swap_slot) * BLOCK_SECTOR_SIZE / SWAP_SLOT_SIZE;
     swap_bitmap = bitmap_create(bitmap_size);
 }
 
@@ -27,12 +27,14 @@ void swap_in (size_t used_index, void* kaddr)
 {
     lock_acquire(&swap_lock);
     swap_slot = block_get_role(BLOCK_SWAP);
+    if(bitmap_test(swap_bitmap, used_index) == false)
+        return;
     int total_idx, idx;
     total_idx = SWAP_SLOT_SIZE / BLOCK_SECTOR_SIZE;
     for (idx=0;idx<total_idx;idx++)
         block_read(swap_slot, used_index * total_idx + idx,\
          kaddr + idx * BLOCK_SECTOR_SIZE);
-    bitmap_set_multiple(swap_bitmap, used_index, 1, false);
+    bitmap_flip(swap_bitmap, used_index);
     lock_release(&swap_lock);
 }
 

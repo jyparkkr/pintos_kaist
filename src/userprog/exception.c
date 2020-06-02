@@ -160,7 +160,9 @@ page_fault (struct intr_frame *f)
     exit(-1);
    
   /*call handle_mm_fault() with vm_entry factor and check if everything ok*/
-  if(handle_mm_fault (vme)==false)
-    exit(-1);  
+  if(handle_mm_fault (vme)==false){
+     if(vme->is_loaded == false)
+         exit(-1);  
+  }
 }
 

@@ -38,6 +38,8 @@ typedef int mapid_t;
 typedef int num_17_14;
 #define ONE_17_14 ((num_17_14) 1 << 14)
 
+/* filesys_lock */
+struct lock filesys_lock; 
 
 /* A kernel thread or user process.
 

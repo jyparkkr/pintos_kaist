@@ -21,6 +21,7 @@
 #include "threads/malloc.h"
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -209,6 +210,8 @@ remove_child_process (struct thread *cp)
 bool handle_mm_fault (struct vm_entry *vme) 
 /*allocate physical memory using palloc_get_page()*/ 
 { 
+  if (vme->is_loaded) //existing page
+    return false;
   struct page *kpage;
   kpage = alloc_page(PAL_USER);
   if(!kpage)
@@ -239,9 +242,10 @@ bool handle_mm_fault (struct vm_entry *vme)
   /*map physical page and virtual page using install_page */
   if(success){
     success = install_page(vme->vaddr,kpage->kaddr, vme->writable);
-    if (!success)
+    if (!success){
       free_page(kpage->kaddr);
-    vme->is_loaded = true;
+      vme->is_loaded = true;
+    }
   }
   else
     free_page(kpage->kaddr);
@@ -674,8 +678,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     vme->vaddr = upage;
     vme->writable    = writable;
 
-    vme->is_loaded = true;
-    vme->file = file;
+    vme->is_loaded = false;
+    vme->file = file_reopen(file);
 
     vme->offset = ofs;
     vme->read_bytes = page_read_bytes;
@@ -710,8 +714,10 @@ setup_stack (void **esp)
   {
     struct vm_entry *vme;
     vme = (struct vm_entry *) malloc (sizeof(struct vm_entry));
-    if (vme == NULL) //malloc failure
+    if (vme == NULL){ //malloc failure
+      free_page(kpage);
       return false;
+    }
     /* Set vm_entry members, offset and size to read when virtual page required
     zero bytes for padding at last, etc*/
     memset (vme, 0, sizeof (struct vm_entry));
@@ -720,11 +726,11 @@ setup_stack (void **esp)
     vme->is_loaded = true;
     vme->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
     /* insermt vm_entry. if fail, return false*/
-    success = insert_vme(&kpage->thread->vm, vme);
 
     kpage->vme = vme;
+    success = insert_vme(&kpage->thread->vm, vme);
     //kpage->thread = thread_current();
-    add_page_to_lru_list(kpage);
+    //add_page_to_lru_list(kpage);
     success &= install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
     if (success)
       *esp = PHYS_BASE;

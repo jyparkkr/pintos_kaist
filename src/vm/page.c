@@ -8,6 +8,7 @@
 #include "threads/palloc.h"
 #include <string.h>
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 
 static unsigned vm_hash_func (const struct hash_elem *e, void *aux UNUSED);
@@ -50,7 +51,11 @@ static void vm_destroy_func(struct hash_elem *e, void *aux UNUSED)
 	ASSERT(e!=NULL);
 	/* vm_entry의 메모리 제거 */
 	struct vm_entry *vme = hash_entry (e, struct vm_entry, elem);
-	//palloc_free_page(vme->vaddr);
+	if(vme->is_loaded){
+		void *kaddr; //physical addr
+		kaddr = pagedir_get_page (thread_current()->pagedir, vme->vaddr);
+		free_page(kaddr);
+	}
   	free (vme);
 }
 
@@ -69,12 +74,11 @@ bool delete_vme (struct hash *vm, struct vm_entry *vme)
 {
 	ASSERT(vm!=NULL);
 	ASSERT(vme!=NULL);
-
 	/*delete vme from vm*/
-	if(hash_delete(vm,&vme->elem)==NULL) //if fail, return false
+	if(hash_delete(vm,&vme->elem)==NULL){ //if fail, return false
+		free(vme);
 		return false;
-	//palloc_free_page(vme);
-	free(vme);
+	}
 	return true;
 }
 
@@ -84,9 +88,9 @@ struct vm_entry *find_vme (void *vaddr)
 	struct hash_elem *e;
 
 	/* get page number of vaddr by pg_round_down()*/
-	vme.vaddr=pg_round_down(vaddr);
+	vme.vaddr = pg_round_down(vaddr);
 	/* get hash_elem structure using hash_find() */
-	e=hash_find(&thread_current()->vm,&vme.elem);
+	e = hash_find(&thread_current()->vm, &vme.elem);
 	if(e==NULL)
 		/* return null if it doesn't exist*/
 		return NULL;
@@ -152,9 +156,9 @@ void __free_page (struct page* page)
 {
 	ASSERT (page != NULL);
 	ASSERT (page->kaddr != NULL);
-	del_page_from_lru_list (page);
-	palloc_free_page (page->kaddr);
 	pagedir_clear_page(page->thread->pagedir, page->vme->vaddr);
+	palloc_free_page (page->kaddr);
+	del_page_from_lru_list (page);
 	free(page);
 }
 

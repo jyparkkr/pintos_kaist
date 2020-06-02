@@ -10,7 +10,6 @@ void check_valid_string (const void* str, void* esp);
 void get_argument(void *esp, int *arg , int count);
 
 /* filesystem lock */
-struct lock filesys_lock; 
 void halt (void);
 void exit (int status);
 tid_t exec (const char *cmd_line);

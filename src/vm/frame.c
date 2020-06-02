@@ -1,5 +1,6 @@
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include "threads/thread.h"
 
 struct list lru_list;
 struct lock lru_list_lock;
@@ -131,8 +132,10 @@ void try_to_free_pages (enum palloc_flags flags UNUSED)
         case VM_FILE:
             if(dirty)
             {
+                lock_acquire(&filesys_lock);
                 file_write_at(pg->vme->file, pg->vme->vaddr,\
                  pg->vme->read_bytes, pg->vme->offset);
+                lock_release(&filesys_lock);
             }
             break;
         case VM_ANON:
