@@ -202,4 +202,5 @@ lru_clock is clock arm of this algorithm.
 2. size of swap slot (#define SWAP_SLOT_SIZE 4096)  is added on swap.c to calculate number of block sector
 needed for one swap slot and to calculate initial bitmap(for swap disk management) size.
 
+3. lock filesys_lock moves syscall to thread.h because when file write, this lock is used.
 
