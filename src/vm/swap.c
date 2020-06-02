@@ -18,8 +18,7 @@ void swap_init ()
     int bitmap_size;
     /* bitmap size is
      disk_sector_num * 512B(disk sector size) / 4kB(swap slot size) */ 
-    bitmap_size = (int) block_size(swap_slot)\
-     * BLOCK_SECTOR_SIZE / SWAP_SLOT_SIZE;
+    bitmap_size = 4096 * 1024 / SWAP_SLOT_SIZE;
     swap_bitmap = bitmap_create(bitmap_size);
 }
 

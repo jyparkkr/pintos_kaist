@@ -1,6 +1,9 @@
 #include "vm/frame.h"
 #include "vm/swap.h"
 
+struct list lru_list;
+struct lock lru_list_lock;
+struct list_elem *lru_clock; // clock pointed for  swap
 
 /* initialize lru_list for swapping */
 void lru_list_init (void)
@@ -58,7 +61,7 @@ find_page_from_lru_list (void* kaddr)
 }
 
 /* when lack of free phyical memory -> get by clock alogrithm */
-void try_to_free_pages (enum palloc_flags flags)
+void try_to_free_pages (enum palloc_flags flags UNUSED)
 {
     lock_acquire(&lru_list_lock);
     /* get victim page to free by clock algorithm */

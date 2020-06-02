@@ -670,7 +670,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     vme->vaddr = upage;
     vme->writable    = writable;
 
-    //vme->is_loaded = 
+    vme->is_loaded = true;
     vme->file = file;
 
     vme->offset = ofs;
@@ -711,7 +711,7 @@ setup_stack (void **esp)
     /* Set vm_entry members, offset and size to read when virtual page required
     zero bytes for padding at last, etc*/
     memset (vme, 0, sizeof (struct vm_entry));
-    success = insert_vme(&thread_current()->vm, vme);
+    success = insert_vme(&kpage->thread->vm, vme);
     vme->type = VM_ANON;
     vme->writable = true;
     vme->is_loaded = true;
@@ -721,7 +721,7 @@ setup_stack (void **esp)
     kpage->vme = vme;
     //kpage->thread = thread_current();
     add_page_to_lru_list(kpage);
-    success &= install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+    success &= install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
     if (success)
       *esp = PHYS_BASE;
       //*esp = PHYS_BASE - 12;
