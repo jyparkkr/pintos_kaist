@@ -11,6 +11,7 @@
 #define VM_FILE 1
 #define VM_ANON 2
 
+/* virtual memory entry structure which matches to physical memory  */
 struct vm_entry{
 	uint8_t type; /* type for VM_BIN, VM_FILE, VM_ANON */
 	void *vaddr; /* virtual page number that vm_entry manages*/
@@ -33,6 +34,7 @@ struct vm_entry{
 	struct hash_elem elem; /* hash table Element */
 };
 
+/* save memory-mapped file's information */
 struct mmap_file {
     int mapid;
     struct file* file;		/* file pointer in mem */
@@ -40,6 +42,7 @@ struct mmap_file {
     struct list vme_list;	/* its vm entry list */
 };
 
+/* managing page which allocated on user physical memory */
 struct page {
 	void *kaddr;			/* physical addr of page */
 	struct vm_entry *vme;	/* points vm_entry linked with physical page */

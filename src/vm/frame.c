@@ -72,6 +72,7 @@ get_next_lru_clock(void)
     return lru_clock;
 }
 
+/* find page of corresponding physical addr from lru_list */
 struct page* 
 find_page_from_lru_list (void* kaddr)
 {

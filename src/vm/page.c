@@ -15,6 +15,7 @@ static unsigned vm_hash_func (const struct hash_elem *e, void *aux UNUSED);
 static bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
 static void vm_destroy_func (struct hash_elem *, void * UNUSED);
 
+/* hash initialize vm */
 void vm_init (struct hash *vm)
 {
 	/*To make sure vm is not null*/
@@ -23,6 +24,7 @@ void vm_init (struct hash *vm)
 	hash_init (vm, vm_hash_func,vm_less_func, NULL);
 }
 
+/* get hash value which use vm_entry's vaddr */
 static unsigned vm_hash_func (const struct hash_elem *e,void *aux UNUSED)
 {
 	ASSERT (e != NULL);
@@ -32,6 +34,7 @@ static unsigned vm_hash_func (const struct hash_elem *e,void *aux UNUSED)
 	return hash_int((int)vme->vaddr);
 }
 
+/* compare function of hash element */
 static bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED)
 {
 	ASSERT (a != NULL);
@@ -46,8 +49,9 @@ static bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b, 
 	return false;
 }
 
+/* remove hash bucket entry*/
 static void vm_destroy_func(struct hash_elem *e, void *aux UNUSED)
-{	/*hash bucket의 entry를 삭제 해주는 함수.*/
+{	
 	ASSERT(e!=NULL);
 	/* vm_entry의 메모리 제거 */
 	struct vm_entry *vme = hash_entry (e, struct vm_entry, elem);
@@ -59,6 +63,7 @@ static void vm_destroy_func(struct hash_elem *e, void *aux UNUSED)
   	free (vme);
 }
 
+/* insert vme on hash table */
 bool insert_vme (struct hash *vm, struct vm_entry *vme)
 {
 	ASSERT(vm!=NULL);
@@ -70,6 +75,7 @@ bool insert_vme (struct hash *vm, struct vm_entry *vme)
 	return false;
 }
 
+/* delete vme from hash table */
 bool delete_vme (struct hash *vm, struct vm_entry *vme)
 {
 	ASSERT(vm!=NULL);
@@ -82,6 +88,7 @@ bool delete_vme (struct hash *vm, struct vm_entry *vme)
 	return true;
 }
 
+/* find vme from hash table */
 struct vm_entry *find_vme (void *vaddr)
 {
 	struct vm_entry vme;
@@ -99,6 +106,7 @@ struct vm_entry *find_vme (void *vaddr)
 		return hash_entry(e, struct vm_entry, elem);
 }
 
+/* destroy vm hash table */
 void vm_destroy (struct hash *vm)
 {
 	ASSERT(vm!=NULL);
@@ -106,6 +114,7 @@ void vm_destroy (struct hash *vm)
 	hash_destroy (vm, vm_destroy_func);
 }
 
+/* load disk file to physical page */
 bool load_file (void* kaddr, struct vm_entry *vme){
 	if((int)vme->read_bytes == file_read_at(vme->file, kaddr, vme->read_bytes, vme->offset))
 	{

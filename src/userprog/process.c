@@ -207,11 +207,9 @@ remove_child_process (struct thread *cp)
   }
 }
 
+/*allocate physical memory to vme alloc_page */ 
 bool handle_mm_fault (struct vm_entry *vme) 
-/*allocate physical memory using palloc_get_page()*/ 
 { 
-  //if (vme->is_loaded)
-  //  return false;
   struct page *kpage = alloc_page(PAL_USER);
   if(!kpage)
     return false;
