@@ -173,7 +173,19 @@ struct mmap_file {
 
 
 ---- ALGORITHMS ----
+Current pintos doesn't have mmap and munmap system call.
+mmap() is function that loads file data to memory by demand paging
+munmap() remove the mapping above
+Mmap first make mapping file structure and make vm_entrys of file. Because file can be too large to 
+contain on single slot, this problem can be solve by make linked list of vm_entry and insert data on it.
+Interesting thing is that thread can search for vm_entry by mmap_list if there is information of file or
+hash table of vm if there is information of address.
+When data is modified, it should be updated to drive. To check this perspective, munmap check modification
+by bool pagedir_is_dirty() and write on disk by file_write_at (). 
 
+
+---- RATIONALE ----
+It passed all test from memory mapped file and shows 10 of 109 tests failed.
 
 Swapping
 =============
@@ -203,4 +215,31 @@ lru_clock is clock arm of this algorithm.
 needed for one swap slot and to calculate initial bitmap(for swap disk management) size.
 
 3. lock filesys_lock moves syscall to thread.h because when file write, this lock is used.
+
+---- ALGORITHMS ----
+To use memory efficiently, choose page to swap by LRU-based algorithm (in this code, I use clock algorithm).
+When page is choosed as victim then save it to swap area(which is swap-in). When process need the page then
+swap out it (load on memory).
+Clock algorithm is circular way of check, which is similar to round robin but check accessed bit which is 
+true when the page is recently accessed. When the page is selected as candidate of victim then check 
+accessed bit whether it is true or false. If it is true then change it to false and point next page, if false
+then choose as victim to swap out.
+Also if there is modification on file then it needs to be updated to disk. It is held by dirty bit. If dirty
+bit is 1, it implies that those page should be updated to disk. To check empty swap disk, 
+bitmap is used to check which is empty.  
+Finally, edit action on page fault to get extra memory by clock algorithm.
+
+
+---- DISCUSSIONS ----
+On try_to_free_pages() on swap.c, ppt recommand to use palloc_flag parameter, but since there is no parameter
+on page which have palloc_flags as its parameter, I just ignore input on try_to_free_pages()
+
+On setup_stack, location of insert_vme() was important. This should be below to adding vme->addr information.
+First, I wrote a code regardless of this information, but during debugging, I got intuition by funcion
+struct vm_entry *find_vme(void *addr) which make new entry (not by pointer) and find corresponding address on vm.
+
+
+---- RATIONALE ----
+It pass all test for swapping and shows 6 of 109 tests failed.
+(failed on page-parallel)
 
