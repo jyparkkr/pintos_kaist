@@ -18,9 +18,14 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "threads/malloc.h"
+#include "vm/page.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -132,6 +137,9 @@ start_process (void *file_name_)
     count++;
   }
 
+  /*initialize hash table using vm_init()*/
+  vm_init(&thread_current()->vm);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -198,6 +206,51 @@ remove_child_process (struct thread *cp)
     palloc_free_page(cp);
   }
 }
+
+/*allocate physical memory to vme alloc_page */ 
+bool handle_mm_fault (struct vm_entry *vme) 
+{ 
+  struct page *kpage = alloc_page(PAL_USER);
+  if(!kpage)
+    return false;
+  kpage->vme = vme;
+  bool success = false;
+  
+/* Deal with various type of vm_entry using switch*/ 
+  switch(vme->type){
+    /* if VM_BIN, load on physical memory using load_file()*/
+    case VM_BIN:
+      success = load_file(kpage->kaddr, vme);
+    break;
+
+    case VM_FILE:
+      success = load_file(kpage->kaddr, vme);
+    break;
+
+    case VM_ANON:
+      swap_in (vme->swap_slot, kpage->kaddr);
+      success = true;
+    break;
+
+    default:
+    break;
+  }
+  /*map physical page and virtual page using install_page */
+  if(success){
+    success = install_page(vme->vaddr,kpage->kaddr, vme->writable);
+    if (success){
+      vme->is_loaded = true;
+    }
+    else
+      free_page(kpage->kaddr);
+  }
+  else
+    free_page(kpage->kaddr);
+  /* load success*/ 
+  return success;
+}
+
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -249,6 +302,13 @@ process_exit (void)
   //lock_release(&filesys_lock);
   /* free fd_table */
   palloc_free_page(cur->fd_table);
+
+  /* clean vm entry and mmap_file */
+  mapid_t mapid;
+  for (mapid = 0;mapid < cur->next_mapid;mapid++)
+    munmap(mapid);
+  
+  vm_destroy(&cur->vm);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -525,7 +585,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -596,38 +655,45 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
-    {
+  {
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
-      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
+    /* create vm_entry using malloc */
+    struct vm_entry *vme = (struct vm_entry *)malloc(sizeof (struct vm_entry));
+    if(vme == NULL)
+      return false;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+    /* Set vm_entry members, offset and size to read when virtual page required
+    zero bytes for padding at last, etc*/
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
+    memset (vme, 0, sizeof (struct vm_entry));
+    vme->type = VM_BIN;
+    vme->vaddr = upage;
+    vme->writable    = writable;
 
-      /* Advance. */
-      read_bytes -= page_read_bytes;
-      zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
+    vme->is_loaded = false;
+    vme->file = file_reopen(file);
+
+    vme->offset = ofs;
+    vme->read_bytes = page_read_bytes;
+    vme->zero_bytes = page_zero_bytes;
+
+    /* insert vm_entry created into hashtable using insert_vme() function*/
+    if(insert_vme(&thread_current()->vm, vme) == false ){
+      free(vme);
+      return false;
     }
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    ofs += page_read_bytes;
+    upage += PGSIZE;
+  }
   return true;
 }
 
@@ -636,19 +702,41 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+  struct page *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  //kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = alloc_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-        //*esp = PHYS_BASE - 12;
-      else
-        palloc_free_page (kpage);
+  {
+    struct vm_entry *vme;
+    vme = (struct vm_entry *) malloc (sizeof(struct vm_entry));
+    if (vme == NULL){ //malloc failure
+      free_page(kpage);
+      return false;
     }
+    /* Set vm_entry members, offset and size to read when virtual page required
+    zero bytes for padding at last, etc*/
+    memset (vme, 0, sizeof (struct vm_entry));
+    vme->type = VM_ANON;
+    vme->writable = true;
+    vme->is_loaded = true;
+    vme->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+    /* insermt vm_entry. if fail, return false*/
+
+    kpage->vme = vme;
+    success = insert_vme(&kpage->thread->vm, vme);
+    //kpage->thread = thread_current();
+    //add_page_to_lru_list(kpage);
+    success &= install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
+    if (success)
+      *esp = PHYS_BASE;
+      //*esp = PHYS_BASE - 12;
+    else{
+      free_page (kpage);
+      free (vme);
+    }
+  }
   return success;
 }
 
@@ -670,4 +758,35 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+/* project3 - memory mapped file */
+/* remove mapping of file from memory */ 
+void do_munmap (struct mmap_file* map_file)
+{
+	struct list_elem *e;
+	for (e = list_begin (&map_file->vme_list); e != list_end (&map_file->vme_list);)
+	{
+		struct vm_entry *vme = list_entry (e, struct vm_entry, mmap_elem);
+    /* update disk */
+    if (vme->is_loaded)
+    {
+      if (pagedir_is_dirty(thread_current()->pagedir, vme->vaddr))
+      {
+        lock_acquire(&filesys_lock);
+        file_write_at(vme->file, vme->vaddr, vme->read_bytes, vme->offset);
+        lock_release(&filesys_lock);
+      }
+      /* clean page table entry */
+      void *kaddr; //physical addr
+      kaddr = pagedir_get_page (thread_current()->pagedir, vme->vaddr);
+      free_page(kaddr);
+    }
+    /* remove */
+    vme->is_loaded = false;
+    e = list_remove(e);
+    delete_vme(&thread_current()->vm, vme); //containing free
+	}
+  list_remove(&map_file->elem);
+  free(map_file);
 }

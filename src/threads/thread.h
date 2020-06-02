@@ -4,8 +4,10 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <hash.h>
 #include "threads/synch.h"
 #include "filesys/file.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -19,7 +21,9 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+typedef int mapid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+#define MAPID_ERROR ((mapid_t) -1)
 
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
@@ -34,6 +38,8 @@ typedef int tid_t;
 typedef int num_17_14;
 #define ONE_17_14 ((num_17_14) 1 << 14)
 
+/* filesys_lock */
+struct lock filesys_lock; 
 
 /* A kernel thread or user process.
 
@@ -111,6 +117,9 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    /*For pj3 virtual memory*/
+    struct hash vm; /* Hashtable for virtual address space that thread owns*/
     
     /*these are for priority donation*/
     int init_priority;               /* To initialize after donation */
@@ -138,6 +147,10 @@ struct thread
     int fd_max;                      /*maximum fd value exists on current table*/
     /* denying write to executable */
     struct file *cur_file;           /* current running file */
+
+    /* pj3 - Memory mapped file */
+    struct list mmap_list;          /* mmap list of opened file */
+    mapid_t next_mapid;             /* first value is 0 for convinence */
   };
 
 /* If false (default), use round-robin scheduler.

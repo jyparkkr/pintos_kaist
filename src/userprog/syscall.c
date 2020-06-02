@@ -11,7 +11,8 @@
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "filesys/off_t.h"
-
+#include "vm/page.h"
+#include "threads/malloc.h"
 
 
 static void syscall_handler (struct intr_frame *);
@@ -23,21 +24,63 @@ syscall_init (void)
   lock_init(&filesys_lock); 
 }
 
-void check_address(void *addr){
+struct vm_entry* check_address(void *addr, void* esp UNUSED){
 	if(!(is_user_vaddr(addr) && addr>=((void *) 0x8048000))){
 		exit(-1);
 	}
-	/*if(pagedir_get_page(thread_current()->pagedir, addr) == NULL){
+	/*addr이 vm_entry에 존재하면 vm_entry를 반환하도록 코드 작성 */
+	struct vm_entry *vme;
+	/*find_vme() 사용*/
+	vme=find_vme(addr);
+	if(vme==NULL)
 		exit(-1);
-	}*/
+	return vme;
 }
+void check_valid_buffer (void *buffer, unsigned size, void *esp, bool to_write) { 
+	struct vm_entry *vme;
+	unsigned check =0;
+	/* size from buffer to buffer + size can be bigger than the size of one page*/
+	vme=check_address(buffer, esp);
+	if(vme==NULL)
+		exit(-1);
+	/*  So we should check vm_entries that included in the address from buffer to buffer + size */
+	while(check<size){
+		/* check if the address is valid and get vm_entry structure by check_address*/
+		vme=check_address(buffer, esp);
+		/*check the existence of vm_entry for that address and if vm_entry->writable is true*/
+		if(vme!=NULL)
+			if(to_write == true && vme->writable==false)
+				exit(-1);
+		buffer++;
+		check++;
+	}
+	buffer=buffer-check;
+}
+
+void check_valid_string (const void *str, void *esp) { 
+/* check the existence of vm_entry about to str*/
+ /* Use check_address()*/ 
+	int count=0;
+	//printf("%s\n",*(char*)str);
+	check_address((void*)str, esp);
+	while(*(char*)str != NULL)
+	{
+    	//printf("open1.2\n");
+		check_address((void*)str, esp);
+    	//printf("open1.6\n");
+		str ++;
+		count++;
+	}
+	str=str-count;
+}
+
 
 /* move user data to kernel */
 void get_argument(void *esp, int *arg , int count) { 
 	int i;
 	for(i=0; i<count; i++){
-		check_address(esp+4*(i+1));
-		check_address(esp+4*(i+1)+3);
+		check_address(esp+4*(i+1),esp);
+		check_address(esp+4*(i+1)+3,esp);
 		arg[i] = *(int*)(esp+4*(i+1));
 	}
 } 
@@ -60,7 +103,7 @@ syscall_handler (struct intr_frame *f)
 {
  	int arg[5];
  	uint32_t *sp = f -> esp; /* userstack pointer */ 
- 	check_address((void *)sp); 
+ 	check_address((void *)sp,f->esp); 
  	int syscall_n = *sp;   /* system call number */
  	//int check = 0;
 
@@ -74,7 +117,7 @@ syscall_handler (struct intr_frame *f)
 			break;                     
     	case SYS_EXEC:
     		get_argument(sp , arg , 1); 
-    		check_address((void *)arg[0]); 
+    		check_valid_string((const void *)arg[0], f->esp);
     		f -> eax = exec((const char *)arg[0]); 
 			break;                     
     	case SYS_WAIT:
@@ -83,20 +126,19 @@ syscall_handler (struct intr_frame *f)
 			break;                 
     	case SYS_CREATE: 
     		get_argument(sp,arg,2);
-    		check_address((void*)arg[0]);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		check_address((void*)arg[0],f->esp);
     		f -> eax = create((const char*)arg[0],(unsigned)arg[1]);
 			break;                   
     	case SYS_REMOVE:
     		get_argument(sp,arg,1);
-    		check_address((void*)arg[0]);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		check_address((void*)arg[0],f->esp);
     		f -> eax = remove((const char*)arg[0]);
 			break;                     
     	case SYS_OPEN: 
     		get_argument(sp,arg,1);
-    		check_address((void*)arg[0]);
-    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		//printf("open1\n");
+    		check_valid_string((const void *)arg[0], f->esp);
+    		//printf("open2\n");
     		f -> eax = open((const char*)arg[0]);
 			break;                      
     	case SYS_FILESIZE:  
@@ -105,8 +147,9 @@ syscall_handler (struct intr_frame *f)
 			break;               
     	case SYS_READ:   
     		get_argument(sp,arg,3);
-    		check_address((void*)arg[1]);
-    		check_address((void*)arg[1]+(unsigned)arg[2]);
+    		check_valid_buffer((void *)arg[1], (unsigned)arg[2], f->esp, true);
+    		//check_address((void*)arg[1]);
+    		//check_address((void*)arg[1]+(unsigned)arg[2]);
     		/*for(check=0;check<(signed)arg[2];check++){
     			if(!get_user((void*)arg[1]+check))
     				exit(-1);
@@ -115,13 +158,14 @@ syscall_handler (struct intr_frame *f)
 			break;                 
     	case SYS_WRITE: 
     		get_argument(sp,arg,3);
-    		check_address((void*)arg[1]);
-    		check_address((void*)arg[1]+(unsigned)arg[2]);
+    		check_valid_buffer((void *)arg[1], (unsigned)arg[2], f->esp, false);
+    		//printf("after buffer check write!!\n");
     		/*for(check=0;check<(signed)arg[2];check++){
     			if(!put_user((void*)arg[1]+check,0))
     				exit(-1);
     		}*/
     		f -> eax = write(arg[0],(void*)arg[1], (unsigned)arg[2]);  
+    		//printf("after loading!!\n");
 			break;                 
     	case SYS_SEEK:  
     		get_argument(sp,arg,2);
@@ -135,8 +179,16 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,1);
     		close(arg[0]);
 			break;  
-		/*default:
-			exit(-1);*/
+		case SYS_MMAP:
+    		get_argument(sp,arg,2);
+    		f -> eax = mmap((int)arg[0],(void *)arg[1]);
+			break;
+		case SYS_MUNMAP:
+    		get_argument(sp,arg,1);
+			munmap((mapid_t) arg[0]);
+			break;
+		default: 
+			thread_exit ();
  	}
 }
 
@@ -170,6 +222,80 @@ tid_t exec (const char *cmd_line){
 		return child;
 	else
 		return -1;
+}
+
+/* memory_mapping */
+mapid_t mmap (int fd, void *addr)
+{
+	if (addr == NULL || pg_ofs(addr) != 0 || !is_user_vaddr(addr))
+		return MAPID_ERROR;
+
+	/* initialize mem_file */
+	struct mmap_file *mem_file;
+	mem_file = (struct mmap_file *) malloc (sizeof (struct mmap_file));
+	if (mem_file == NULL)
+		return MAPID_ERROR;
+
+	memset (mem_file, 0, sizeof (struct mmap_file));
+	mem_file->mapid = thread_current()->next_mapid++;
+	struct file *file_from_fd = process_get_file(fd);
+	if (file_from_fd == NULL)
+		return MAPID_ERROR;
+	mem_file->file = file_reopen(file_from_fd);
+	list_init(&mem_file->vme_list);
+	list_push_back(&thread_current()->mmap_list, &mem_file->elem);
+
+	/* vm_entry init */
+	int remain_len;
+	size_t offset = 0;
+	remain_len = file_length(mem_file->file);
+	while(remain_len > 0)
+	{
+		if(find_vme(addr)) //double vme
+			return -1;
+
+		struct vm_entry *vme;
+		vme = (struct vm_entry *) malloc (sizeof (struct vm_entry));
+		if (vme == NULL)
+			return MAPID_ERROR;
+
+		memset (vme, 0, sizeof (struct vm_entry));
+		vme->type = VM_FILE;
+		vme->vaddr = addr;
+		vme->writable = true;
+
+		vme->is_loaded = false;
+		vme->file = mem_file->file;
+
+		vme->offset = offset;
+		vme->read_bytes = PGSIZE > remain_len ? remain_len : PGSIZE;
+		vme->zero_bytes = PGSIZE > remain_len ? PGSIZE - remain_len : 0;
+
+		// vme->swap_slot = ; will be implement in swap slot
+		insert_vme(&thread_current()->vm, vme);
+		list_push_back(&mem_file->vme_list, &vme->mmap_elem);
+		addr += PGSIZE;
+		offset += PGSIZE;
+		remain_len -= PGSIZE;
+	}
+	return mem_file->mapid;
+}
+
+void munmap (mapid_t mapping)
+{
+	struct list_elem *e;
+	struct list *mmap_list;
+	mmap_list = &thread_current()->mmap_list;
+	for (e = list_begin (mmap_list); e != list_end (mmap_list);
+		e = list_next (e))
+	{
+		struct mmap_file *mm = list_entry (e, struct mmap_file, elem);
+		if (mm->mapid == mapping){
+			do_munmap(mm);
+			return; //no double vme
+		}
+	}
+	/* what if mapid is CLOSE_ALL */
 }
 
 int wait (tid_t tid){

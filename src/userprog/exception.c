@@ -148,18 +148,21 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-  /* pj2.4 - page fault occur -> call exit(-1) */
-  /*f->eip = (void*)f->eax;
-  f->eax = 0xffffffff;*/
-  exit(-1);
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  //printf("came here\n");
+ 
+  struct vm_entry *vme;
+  /* if it is not an approach for read only page (use not_present)*/ 
+  if (not_present==false)
+    exit (-1);
+  /* search vm_entry structure about page fault address */ 
+  vme = find_vme (fault_addr);
+  if(!vme)
+    exit(-1);
+   
+  /*call handle_mm_fault() with vm_entry factor and check if everything ok*/
+  if(handle_mm_fault (vme)==false){
+     if(vme->is_loaded == false)
+         exit(-1);  
+  }
 }
 
