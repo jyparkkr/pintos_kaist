@@ -13,7 +13,7 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
-#define DIRECT_BLOCK_ENTRIES 123 // 125 - 2
+#define DIRECT_BLOCK_ENTRIES 124 // 125 - 2
 #define INDIRECT_BLOCK_ENTRIES BLOCK_SECTOR_SIZE / sizeof(block_sector_t)
 
 /* On-disk inode.
