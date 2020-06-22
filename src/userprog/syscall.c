@@ -11,6 +11,7 @@
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "filesys/off_t.h"
+#include "filesys/directory.h"
 
 
 
@@ -136,10 +137,24 @@ syscall_handler (struct intr_frame *f)
     		close(arg[0]);
 			break;  
 		case SYS_CHDIR:
+    		get_argument(sp,arg,1);
+    		check_address((void*)arg[0]);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		f -> eax = chdir((const char*)arg[0]);
 			break;
 		case SYS_MKDIR:
-			break;
+    		get_argument(sp,arg,1);
+    		check_address((void*)arg[0]);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		f -> eax = mkdir((const char*)arg[0]);
+			break;                      
 		case SYS_READDIR:
+    		get_argument(sp,arg,2);
+    		check_address((void*)arg[1]);
+    		check_address((void*)arg[1] + NAME_MAX + 1);
+    		f -> eax = sys_readdir(arg[0],(void*)arg[1], (unsigned)arg[2]);  
+
+
 			break;
 		case SYS_INUMBER:
 			break;
