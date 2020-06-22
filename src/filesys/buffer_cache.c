@@ -160,11 +160,11 @@ void bc_flush_all_entries (void){
   	for(i=0;i<BUFFER_CACHE_ENTRY_NB;i++){
   		head=&buffer_head[i];
     	if(head->dirty && head->used){
-    		lock_acquire(&head->lock);
+    		//lock_acquire(&head->lock);
     		bc_flush_entry(head);
     		head->used = false;
     		head->clock = false;
-    		lock_release(&head->lock);
+    		//lock_release(&head->lock);
     	}
     }
 /* 전역변수 buffer_head를 순회하며, dirty인 entry는
