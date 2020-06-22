@@ -636,16 +636,13 @@ static bool inode_update_file_length (struct inode_disk* disk_inode,\
     }
     else
     {
-      if (free_map_allocate(1, &sector_idx))
+      if (!free_map_allocate(1, &sector_idx))
       {
-        locate_byte (offset, &sec_loc);
-        if (!register_sector (disk_inode, sector_idx, sec_loc))
-        {
-          free(zeroes);
-          return false;
-        }
+        free(zeroes);
+        return false;
       }
-      else
+      locate_byte (offset, &sec_loc);
+      if (!register_sector (disk_inode, sector_idx, sec_loc))
       {
         free(zeroes);
         return false;
