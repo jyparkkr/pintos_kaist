@@ -15,7 +15,7 @@ struct buffer_head{
   // clock bit for clock algorithm
   bool clock;
   // lock variable
-  //struct lock lock;
+  struct lock lock;
   // data pointer to point buffer cache entry
   void *buffer;
 };

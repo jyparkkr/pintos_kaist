@@ -30,7 +30,7 @@ void bc_init(void) {
 		head = &buffer_head[i];
 		memset(head,0, sizeof (struct buffer_head));
 		/* 전역변수 buffer_head 자료구조 초기화 */
-  		//lock_init (&head->lock);
+  		lock_init (&head->lock);
 		head->clock = false;
 		head->dirty = false;
 		head->used = false;
@@ -56,67 +56,64 @@ struct buffer_head* bc_select_victim (void) {
 	//printf("333\n");
 	struct buffer_head *check_clock;
 	check_clock = clock_hand;
+	
   	for (;clock_hand != buffer_head + BUFFER_CACHE_ENTRY_NB;clock_hand++)
     {
-        //lock_acquire (&clock_hand->lock);
-    	//printf("3?!?!?!?!?!?!?\n");
+        lock_acquire (&clock_hand->lock);
         if (!clock_hand->used)
         {
-    		//printf("4?!?!?!?!?!?!?\n");
-            return clock_hand++;
+            return clock_hand;
         }
         else{
         	if(!clock_hand->clock){
         		if(clock_hand->dirty){
 		        	bc_flush_entry(clock_hand);
 		        	clock_hand->clock = true;
-		        	return clock_hand++;
+		        	return clock_hand;
 		        }
         	
 	        	else if(!clock_hand->dirty){
+		        	bc_flush_entry(clock_hand);
 	        		clock_hand->clock = true;
-	        		return clock_hand++;
+	        		return clock_hand;
 	        	}
 	        }
 	        else
 	        	clock_hand->clock = false;
         }
-        //lock_release (&clock_hand->lock); 
+        lock_release (&clock_hand->lock); 
     }
-    //printf("333-1\n");
     clock_hand = buffer_head;
     for (; clock_hand != buffer_head + BUFFER_CACHE_ENTRY_NB;clock_hand++)
     {
+        lock_acquire (&clock_hand->lock);
         if (!clock_hand->used)
         {
-    		//printf("kkk?!?!?!?!?!?!?\n");
-            return clock_hand++;
+            return clock_hand;
         }
         else{ 
         	if(!clock_hand->clock){
 	        	if(clock_hand->dirty){
 		        	bc_flush_entry(clock_hand);
-		        	clock_hand->clock = true;
-		        	return clock_hand++;
+		        	clock_hand->clock = true; 
+		        	return clock_hand;
 	        	}
 	        	
 	        	else{
-	        		clock_hand->clock = true;
-	        		return clock_hand++;
+		        	bc_flush_entry(clock_hand);
+	        		clock_hand->clock = true; 
+	        		return clock_hand;
 	        	}
         	}
         	else
         		clock_hand->clock = false;
         }
-        //lock_release (&clock_hand->lock); 
+        lock_release (&clock_hand->lock); 
     }
-    //never coming
-    //printf("333-2\n");
+    /*should not reach here*/
     clock_hand = buffer_head;
-    //clock_hand++;
-    return clock_hand++;
+    return clock_hand;
 }
-  	//NOT_REACHRED ();
 /* clock 알고리즘을 사용하여 victim entry를 선택 */
 /* buffer_head 전역변수를 순회하며 clock_bit 변수를 검사 */
 /* 선택된 victim entry가 dirty일 경우, 디스크로 flush */
@@ -133,7 +130,7 @@ struct buffer_head* bc_lookup (block_sector_t sector){
         {
           	// 캐시 적중 상황입니다.
           	// 데이터에 접근하기 전에 더 구체적인 락을 획득하고,
-          	//lock_acquire (&head->lock);
+          	lock_acquire (&head->lock);
           	return head;
         }
     }
@@ -163,9 +160,11 @@ void bc_flush_all_entries (void){
   	for(i=0;i<BUFFER_CACHE_ENTRY_NB;i++){
   		head=&buffer_head[i];
     	if(head->dirty && head->used){
+    		lock_acquire(&head->lock);
     		bc_flush_entry(head);
     		head->used = false;
     		head->clock = false;
+    		lock_release(&head->lock);
     	}
     }
 /* 전역변수 buffer_head를 순회하며, dirty인 entry는
@@ -195,6 +194,7 @@ bool bc_read (block_sector_t sector_idx, void *buffer, off_t bytes_read, int chu
     bf_head->used=true;
 	/* memcpy 함수를 통해, buffer에 디스크 블록 데이터를 복사 */
 	memcpy (buffer + bytes_read, bf_head->buffer + sector_ofs, chunk_size);
+	lock_release(&bf_head->lock);
 	
 	return true;
 }
@@ -213,6 +213,9 @@ bool bc_write (block_sector_t sector_idx, void *buffer, off_t bytes_written, int
     	/* 검색 결과가 없을 경우, 디스크 블록을 캐싱 할 buffer entry의
 		buffer_head를 구함 (bc_select_victim 함수 이용) */
     	bf_head = bc_select_victim();
+    	clock_hand++;
+    	if(clock_hand = buffer_head + BUFFER_CACHE_ENTRY_NB)
+			clock_hand = buffer_head;
     	//bc_flush_entry (bf_head);
     	bf_head->used=true;
     	bf_head->disk_addr = sector_idx;
@@ -228,7 +231,7 @@ bool bc_write (block_sector_t sector_idx, void *buffer, off_t bytes_written, int
 	memcpy (bf_head->buffer + sector_ofs, buffer + bytes_written, chunk_size);
 	//printf("999-1\n");
 	/* buffer_head의 clock bit을 setting */
-	//lock_release (&bf_head->lock);
+	lock_release (&bf_head->lock);
 	success=true;
 	return success;
 }
