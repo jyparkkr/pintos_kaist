@@ -19,3 +19,6 @@
 **/*.d
 **/*.result
 **/*.o
+
+**/build
+**/build/*
