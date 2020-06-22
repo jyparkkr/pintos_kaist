@@ -13,7 +13,7 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
-#define DIRECT_BLOCK_ENTRIES 124 // 125 - 2
+#define DIRECT_BLOCK_ENTRIES 124
 #define INDIRECT_BLOCK_ENTRIES BLOCK_SECTOR_SIZE / sizeof(block_sector_t)
 
 /* On-disk inode.
@@ -389,10 +389,11 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   get_disk_inode (inode, disk_inode);
 
   int old_length = disk_inode->length;
+  disk_inode->length = offset + size;
   int write_end = offset + size - 1;
   if (write_end > old_length - 1)
   {
-    if (!inode_update_file_length (disk_inode, disk_inode->length, write_end))
+    if (!inode_update_file_length (disk_inode, old_length, write_end))
       return 0;
   }
   lock_release (&inode->extend_lock);
@@ -401,9 +402,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     {
       /* Sector to write, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (disk_inode, offset);
-      if (sector_idx == (block_sector_t) -1)
-        break;
-
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -609,7 +607,6 @@ static bool inode_update_file_length (struct inode_disk* disk_inode,\
   if (start_pos > end_pos)
     return false;
 
-
   block_sector_t sector_idx;
   uint8_t **zeroes;
   zeroes = (uint8_t **) malloc (BLOCK_SECTOR_SIZE);
@@ -638,6 +635,8 @@ static bool inode_update_file_length (struct inode_disk* disk_inode,\
     if (sector_idx != (block_sector_t) -1)
     {
       /* Nothing to do with - may happen on first loop */
+      size -= chunk_size;
+      offset += chunk_size;
       continue;
     }
     else
