@@ -215,7 +215,9 @@ bool bc_write (block_sector_t sector_idx, void *buffer, off_t bytes_written, int
     	bf_head = bc_select_victim();
     	clock_hand++;
     	if(clock_hand = buffer_head + BUFFER_CACHE_ENTRY_NB)
+		{
 			clock_hand = buffer_head;
+		}	
     	//bc_flush_entry (bf_head);
     	bf_head->used=true;
     	bf_head->disk_addr = sector_idx;
