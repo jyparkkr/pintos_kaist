@@ -24,6 +24,9 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
     //uint32_t unused[125];               /* Not used. */
+
+    uint32_t is_dir;                        /*0 for file, 1 for dir*/
+
     /* Data containing disk sector */
     block_sector_t direct_map_table[DIRECT_BLOCK_ENTRIES];  
     /* Indirect block which contains data blocks */
@@ -172,7 +175,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, uint32_t is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -189,6 +192,7 @@ inode_create (block_sector_t sector, off_t length)
       memset (disk_inode, -1, BLOCK_SECTOR_SIZE);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->is_dir = is_dir;
       if (length > 0)
       {
         if (!inode_update_file_length(disk_inode, 0, length))
@@ -713,4 +717,18 @@ static void free_inode_sectors (struct inode_disk *disk_inode)
     free_map_release(disk_inode->direct_map_table[i], 1);
     i++;
   }
+}
+
+bool inode_is_dir (const struct inode *inode) {
+  bool result;
+  /* inode_disk 자료구조를 메모리에 할당 */
+  /* in-memory inode의 on-disk inode를 읽어 inode_disk에 저장 */
+  /* on-disk inode의 is_dir을 result에 저장하여 반환 */
+  struct inode_disk *inode_disk;
+  if (inode->removed)
+    return false;
+  if (!get_disk_inode (inode, inode_disk))
+    return false;
+  result = inode_disk->is_dir;
+  return result;
 }

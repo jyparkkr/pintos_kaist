@@ -138,6 +138,9 @@ struct thread
     int fd_max;                      /*maximum fd value exists on current table*/
     /* denying write to executable */
     struct file *cur_file;           /* current running file */
+
+    /*used for pj4-subdirectory*/
+    struct dir *cur_dir;         /*current directory*/
   };
 
 /* If false (default), use round-robin scheduler.

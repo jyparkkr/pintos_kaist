@@ -27,9 +27,10 @@ filesys_init (bool format)
   free_map_init ();
 
   if (format) 
-    do_format ();
+    do_format();
 
-  free_map_open ();
+  free_map_open();
+  thread_current()->cur_dir = dir_open_root ();
 }
 
 /* Shuts down the file system module, writing any unwritten data
@@ -49,11 +50,13 @@ bool
 filesys_create (const char *name, off_t initial_size) 
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
+  char* cp_name = name;
+  char file_name[PATH_MAX_LEN + 1];
+  struct dir *dir = parse_path(cp_name, file_name);
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
-                  && inode_create (inode_sector, initial_size)
-                  && dir_add (dir, name, inode_sector));
+                  && inode_create (inode_sector, initial_size,0)
+                  && dir_add (dir, file_name, inode_sector));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
@@ -69,11 +72,13 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
+  char* cp_name = name;
+  char file_name[PATH_MAX_LEN + 1];
+  struct dir *dir = parse_path (cp_name, file_name);
   struct inode *inode = NULL;
 
   if (dir != NULL)
-    dir_lookup (dir, name, &inode);
+    dir_lookup (dir, file_name, &inode);
   dir_close (dir);
 
   return file_open (inode);
@@ -86,10 +91,35 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
-  dir_close (dir); 
+  char* cp_name = name;
+  char file_name[PATH_MAX_LEN + 1];
+  struct dir *dir = parse_path (cp_name, file_name);
 
+  struct inode *inode;
+  dir_lookup (dir, file_name, &inode);
+
+  struct dir *cur_dir = NULL;
+  char temp[PATH_MAX_LEN + 1];
+
+  if (!inode_is_dir (inode)){
+    if(!dir)
+      success = false;
+    else if(!dir_remove (dir, file_name))
+      success = false;
+    dir_close (dir);
+    success=true;
+  }
+  else if((cur_dir = dir_open (inode))){
+    if(!dir_readdir (cur_dir, temp)){
+      if(!dir)
+        success = false;
+      else if(!dir_remove (dir, file_name))
+        success = false;
+      dir_close (dir);
+      success = true;
+    }
+    dir_close (cur_dir);
+  }
   return success;
 }
 
@@ -103,4 +133,43 @@ do_format (void)
     PANIC ("root directory creation failed");
   free_map_close ();
   printf ("done.\n");
+}
+
+struct dir* parse_path (char *path_name, char *file_name) {
+  struct dir *dir;
+  if (path_name == NULL || file_name == NULL)
+    goto fail;
+  if (strlen(path_name) == 0)
+    return NULL;
+  /* PATH_NAME의 절대/상대경로에 따른 디렉터리 정보 저장 (구현)*/
+  char *token, *nextToken, *savePtr;
+  token = strtok_r (path_name, "/", &savePtr);
+  nextToken = strtok_r (NULL, "/", &savePtr);
+  while (token != NULL && nextToken != NULL){
+    struct inode *inode = NULL;
+    /* dir에서 token이름의 파일을 검색하여 inode의 정보를 저장*/
+    if (!dir_lookup (dir, token, &inode))
+    {
+      dir_close (dir);
+      return NULL;
+    }
+    /* inode가 파일일 경우 NULL 반환 */
+    if (!inode_is_dir (inode))
+    {
+      dir_close (dir);
+      return NULL;
+    }
+    /* dir의 디렉터리 정보를 메모리에서 해지 */
+    dir_close (dir);
+    /* inode의 디렉터리 정보를 dir에 저장 */
+    dir = dir_open (inode);
+
+    /* token에 검색할 경로 이름 저장 */
+    token = next_token;
+    next_token = strtok_r (NULL, "/", &save_ptr);
+  }
+  /* token의 파일 이름을 file_name에 저장*/
+  strlcpy (file_name, token, PATH_MAX_LEN);
+  /* dir 정보 반환 */
+  return dir;
 }

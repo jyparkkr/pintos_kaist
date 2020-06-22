@@ -127,6 +127,7 @@ thread_init (void)
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
+  initial_thread->cur_dir = NULL;
   initial_thread->tid = allocate_tid ();
 }
 
@@ -213,7 +214,10 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
+  if(thread_current()->cur_dir != NULL){
+    /* set child thread's directory to parent's directory by reopen the directory*/
+    t->cur_dir = dir_reopen(thread_current()->cur_dir);
+  }
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -805,6 +809,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* Initialize child list */
   list_init(&t -> child_list);
+  /*initialize cur directory*/
+  t->cur_dir = NULL;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
