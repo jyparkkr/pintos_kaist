@@ -13,7 +13,7 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
-#define DIRECT_BLOCK_ENTRIES 124 // 125 - 2
+#define DIRECT_BLOCK_ENTRIES 124
 #define INDIRECT_BLOCK_ENTRIES BLOCK_SECTOR_SIZE / sizeof(block_sector_t)
 
 /* On-disk inode.
@@ -27,7 +27,7 @@ struct inode_disk
 
     uint32_t is_dir;                        /*0 for file, 1 for dir*/
 
-    /* Data containing disk sector */
+    /* Data containing disk sector. -1 for unassigned */
     block_sector_t direct_map_table[DIRECT_BLOCK_ENTRIES];  
     /* Indirect block which contains data blocks */
     block_sector_t indirect_block_sec;
@@ -44,7 +44,7 @@ enum direct_t
   OUT_LIMIT           /* Wrong file offset */
 };
 
-/* Save way to access block addr, offset of index block */
+/* Save way to access block addr, offset of index block. */
 struct sector_location
   {
     uint8_t directness;  /* Way to access disk block - from direct_t */
@@ -341,6 +341,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       /* Disk sector to read, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (disk_inode, offset);
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
+      if (sector_idx == (block_sector_t) -1)
+        break;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       off_t inode_left = disk_inode->length - offset;
@@ -391,10 +393,11 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   get_disk_inode (inode, disk_inode);
 
   int old_length = disk_inode->length;
+  disk_inode->length = offset + size;
   int write_end = offset + size - 1;
   if (write_end > old_length - 1)
   {
-    if (!inode_update_file_length (disk_inode, disk_inode->length, write_end))
+    if (!inode_update_file_length (disk_inode, old_length, write_end))
       return 0;
   }
   lock_release (&inode->extend_lock);
@@ -636,20 +639,19 @@ static bool inode_update_file_length (struct inode_disk* disk_inode,\
     if (sector_idx != (block_sector_t) -1)
     {
       /* Nothing to do with - may happen on first loop */
+      size -= chunk_size;
+      offset += chunk_size;
       continue;
     }
     else
     {
-      if (free_map_allocate(1, &sector_idx))
+      if (!free_map_allocate(1, &sector_idx))
       {
-        locate_byte (offset, &sec_loc);
-        if (!register_sector (disk_inode, sector_idx, sec_loc))
-        {
-          free(zeroes);
-          return false;
-        }
+        free(zeroes);
+        return false;
       }
-      else
+      locate_byte (offset, &sec_loc);
+      if (!register_sector (disk_inode, sector_idx, sec_loc))
       {
         free(zeroes);
         return false;
@@ -676,7 +678,7 @@ static void free_indirect_release (block_sector_t indirect_sector_idx)
   if(!bc_read(indirect_sector_idx, release_block, 0, BLOCK_SECTOR_SIZE, 0))
     return;
   i = 0;
-  while (release_block->map_table[i] > 0)
+  while (release_block->map_table[i] != (block_sector_t) -1)
   {
     free_map_release (release_block->map_table[i], 1);
     i++;
@@ -692,13 +694,13 @@ static void free_inode_sectors (struct inode_disk *disk_inode)
   struct inode_indirect_block *d_release_block;
   /* Double indirect */
   d_idx = disk_inode -> double_indirect_block_sec;
-  if (d_idx > 0)
+  if (d_idx != (block_sector_t) -1)
   {
     d_release_block = (struct inode_indirect_block *) malloc (BLOCK_SECTOR_SIZE);
     if(!bc_read(d_idx, d_release_block, 0, BLOCK_SECTOR_SIZE, 0))
       return;
     i = 0;
-    while (d_release_block->map_table[i] > 0)
+    while (d_release_block->map_table[i] != (block_sector_t) -1)
     {
       free_indirect_release (d_release_block->map_table[i]);
     }
@@ -706,13 +708,13 @@ static void free_inode_sectors (struct inode_disk *disk_inode)
     free (d_release_block);
   }
   /* Indirect */
-  if (disk_inode->indirect_block_sec > 0)
+  if (disk_inode->indirect_block_sec != (block_sector_t) -1)
   {
     free_indirect_release (disk_inode->indirect_block_sec);
   }
   /* Direct */
   i = 0;
-  while (disk_inode -> direct_map_table[i] > 0)
+  while (disk_inode -> direct_map_table[i] != (block_sector_t) -1)
   {
     free_map_release(disk_inode->direct_map_table[i], 1);
     i++;
