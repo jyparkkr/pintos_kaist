@@ -172,7 +172,8 @@ block_write 함수를 호출하여 디스크로 flush */
 /* 디스크로 flush한 후, buffer_head의 dirty 값 update */
 }
 
-bool bc_read (block_sector_t sector_idx, void *buffer, off_t bytes_read, int chunk_size, int sector_ofs)
+bool bc_read (block_sector_t sector_idx, void *buffer,\
+ off_t bytes_read, int chunk_size, int sector_ofs)
 {
 	//printf("777\n");
 	//printf("%s\n",(char*)buffer);
@@ -199,7 +200,8 @@ bool bc_read (block_sector_t sector_idx, void *buffer, off_t bytes_read, int chu
 	return true;
 }
 
-bool bc_write (block_sector_t sector_idx, void *buffer, off_t bytes_written, int chunk_size, int sector_ofs)
+bool bc_write (block_sector_t sector_idx, void *buffer,\
+ off_t bytes_written, int chunk_size, int sector_ofs)
 {
 
 	//printf("888\n");
