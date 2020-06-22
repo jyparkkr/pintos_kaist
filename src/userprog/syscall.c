@@ -11,6 +11,7 @@
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "filesys/off_t.h"
+#include "threads/thread.h"
 
 
 
@@ -135,7 +136,7 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,1);
     		close(arg[0]);
 			break;  
-		case SYS_CHDIR:
+		/*case SYS_CHDIR:
 			break;
 		case SYS_MKDIR:
 			break;
@@ -143,7 +144,7 @@ syscall_handler (struct intr_frame *f)
 			break;
 		case SYS_INUMBER:
 			break;
-		/*default:
+		default:
 			exit(-1);*/
  	}
 }
@@ -288,12 +289,12 @@ void close (int fd) {
 	process_close_file(fd);  
 }
 
-bool sys_chdir (const char *dir) {
+//bool sys_chdir (const char *dir) {
 	/* dir 경로를 분석하여 디렉터리를 반환 */
 	/* 스레드의 현재 작업 디렉터리를 변경 */
-}
-
+//}
+/*
 bool sys_mkdir (const char *dir)
 {
 	return filesys_create_dir(dir);
-}
+}*/

@@ -7,6 +7,7 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "filesys/buffer_cache.h"
+#include "threads/thread.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -50,13 +51,17 @@ bool
 filesys_create (const char *name, off_t initial_size) 
 {
   block_sector_t inode_sector = 0;
-  char* cp_name = name;
+  char cp_name[PATH_MAX_LEN+1];
+  strlcpy(cp_name,name,PATH_MAX_LEN+1);
   char file_name[PATH_MAX_LEN + 1];
+  printf("!!\n");
   struct dir *dir = parse_path(cp_name, file_name);
+  printf("!!22\n");
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size,0)
                   && dir_add (dir, file_name, inode_sector));
+  printf("success : %d\n",success);
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
@@ -68,11 +73,12 @@ filesys_create (const char *name, off_t initial_size)
    Returns the new file if successful or a null pointer
    otherwise.
    Fails if no file named NAME exists,
-   or if an internal memory allocation fails. */
+   or if an internal memory allocation fails.*/
 struct file *
 filesys_open (const char *name)
 {
-  char* cp_name = name;
+  char cp_name[PATH_MAX_LEN+1];
+  strlcpy(cp_name,name,PATH_MAX_LEN+1);
   char file_name[PATH_MAX_LEN + 1];
   struct dir *dir = parse_path (cp_name, file_name);
   struct inode *inode = NULL;
@@ -91,7 +97,9 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  char* cp_name = name;
+  bool success = false;
+  char cp_name[PATH_MAX_LEN+1];
+  strlcpy(cp_name,name,PATH_MAX_LEN+1);
   char file_name[PATH_MAX_LEN + 1];
   struct dir *dir = parse_path (cp_name, file_name);
 
@@ -102,21 +110,13 @@ filesys_remove (const char *name)
   char temp[PATH_MAX_LEN + 1];
 
   if (!inode_is_dir (inode)){
-    if(!dir)
-      success = false;
-    else if(!dir_remove (dir, file_name))
-      success = false;
+    success = dir != NULL && dir_remove (dir, name);
     dir_close (dir);
-    success=true;
   }
   else if((cur_dir = dir_open (inode))){
     if(!dir_readdir (cur_dir, temp)){
-      if(!dir)
-        success = false;
-      else if(!dir_remove (dir, file_name))
-        success = false;
+      success = dir != NULL && dir_remove (dir, name);
       dir_close (dir);
-      success = true;
     }
     dir_close (cur_dir);
   }
@@ -136,15 +136,30 @@ do_format (void)
 }
 
 struct dir* parse_path (char *path_name, char *file_name) {
-  struct dir *dir;
+  struct dir *dir = NULL;
   if (path_name == NULL || file_name == NULL)
-    goto fail;
+    return NULL;
   if (strlen(path_name) == 0)
     return NULL;
-  /* PATH_NAME의 절대/상대경로에 따른 디렉터리 정보 저장 (구현)*/
+  /* PATH_NAME의 절대/상대경로에 따른 디렉터리 정보 저장(구현)*/
+  if (path_name[0] == '/')
+    dir = dir_open_root ();
+  else
+    dir = dir_reopen (thread_current ()->cur_dir);
+
+  printf("!!4\n");
+  if (!inode_is_dir (dir_get_inode (dir)))
+    return NULL;
+  printf("!!5\n");
   char *token, *nextToken, *savePtr;
   token = strtok_r (path_name, "/", &savePtr);
   nextToken = strtok_r (NULL, "/", &savePtr);
+  if (token == NULL)
+  {
+    strlcpy (file_name, ".", PATH_MAX_LEN);
+    return dir;
+  }
+   printf("!!3\n");
   while (token != NULL && nextToken != NULL){
     struct inode *inode = NULL;
     /* dir에서 token이름의 파일을 검색하여 inode의 정보를 저장*/
@@ -165,8 +180,8 @@ struct dir* parse_path (char *path_name, char *file_name) {
     dir = dir_open (inode);
 
     /* token에 검색할 경로 이름 저장 */
-    token = next_token;
-    next_token = strtok_r (NULL, "/", &save_ptr);
+    token = nextToken;
+    nextToken = strtok_r (NULL, "/", &savePtr);
   }
   /* token의 파일 이름을 file_name에 저장*/
   strlcpy (file_name, token, PATH_MAX_LEN);
