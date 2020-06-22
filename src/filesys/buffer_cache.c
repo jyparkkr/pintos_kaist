@@ -10,7 +10,7 @@
 
 /*BUFFER_CACHE_ENTRY_NB : number of buffer cache entry which is 64 (32kb)*/
 #define BUFFER_CACHE_ENTRY_NB 64
-/* *p_buffer_cache : pointing buffer cache memory space*/
+/* p_buffer_cache[] : array that pointing buffer cache memory space*/
 //static void* p_buffer_cache;
 static char p_buffer_cache[BUFFER_CACHE_ENTRY_NB * BLOCK_SECTOR_SIZE];
 /*buffer_head[]: buffer head array*/
@@ -146,6 +146,7 @@ void bc_flush_entry (struct buffer_head *p_flush_entry)
 	////printf("555\n");
 	//if (!p_flush_entry->used || !p_flush_entry->dirty)
     //	return;
+    ASSERT (lock_held_by_current_thread (&p_flush_entry->lock));
   	p_flush_entry->dirty = false;
   	block_write (fs_device, p_flush_entry->disk_addr, p_flush_entry->buffer);
 /* block_write을 호출하여, 인자로 전달받은 buffer cache entry
@@ -185,6 +186,7 @@ bool bc_read (block_sector_t sector_idx, void *buffer, off_t bytes_read, int chu
     	bf_head = bc_select_victim();
     	bf_head->dirty=false;
     	bf_head->disk_addr = sector_idx;
+    	//lock_release (&bc_lock);
 		/* block_read 함수를 이용해, 디스크 블록 데이터를 buffer cache
 		로 read */
       	block_read (fs_device, sector_idx, bf_head->buffer);
@@ -222,6 +224,7 @@ bool bc_write (block_sector_t sector_idx, void *buffer, off_t bytes_written, int
 		/* block_read 함수를 이용해, 디스크 블록 데이터를 buffer cache
 		로 read */
 		//printf("999\n");
+		//lock_release (&bc_lock);
       	block_read (fs_device, sector_idx, bf_head->buffer);
     }
 	bf_head->clock = true;
