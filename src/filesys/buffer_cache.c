@@ -158,13 +158,13 @@ void bc_flush_all_entries (void){
 	struct buffer_head *head;
   	int i=0;
   	for(i=0;i<BUFFER_CACHE_ENTRY_NB;i++){
-  		head=&buffer_head[i];
+  		head = &buffer_head[i];
     	if(head->dirty && head->used){
-    		lock_acquire(&head->lock);
+    		//lock_acquire(&head->lock);
     		bc_flush_entry(head);
     		head->used = false;
     		head->clock = false;
-    		lock_release(&head->lock);
+    		//lock_release(&head->lock);
     	}
     }
 /* 전역변수 buffer_head를 순회하며, dirty인 entry는
@@ -172,7 +172,8 @@ block_write 함수를 호출하여 디스크로 flush */
 /* 디스크로 flush한 후, buffer_head의 dirty 값 update */
 }
 
-bool bc_read (block_sector_t sector_idx, void *buffer, off_t bytes_read, int chunk_size, int sector_ofs)
+bool bc_read (block_sector_t sector_idx, void *buffer,\
+ off_t bytes_read, int chunk_size, int sector_ofs)
 {
 	//printf("777\n");
 	//printf("%s\n",(char*)buffer);
@@ -193,13 +194,14 @@ bool bc_read (block_sector_t sector_idx, void *buffer, off_t bytes_read, int chu
 	bf_head->clock = true;
     bf_head->used=true;
 	/* memcpy 함수를 통해, buffer에 디스크 블록 데이터를 복사 */
-	memcpy (buffer + bytes_read, bf_head->buffer + sector_ofs, chunk_size);
 	lock_release(&bf_head->lock);
+	memcpy (buffer + bytes_read, bf_head->buffer + sector_ofs, chunk_size);
 	
 	return true;
 }
 
-bool bc_write (block_sector_t sector_idx, void *buffer, off_t bytes_written, int chunk_size, int sector_ofs)
+bool bc_write (block_sector_t sector_idx, void *buffer,\
+ off_t bytes_written, int chunk_size, int sector_ofs)
 {
 
 	//printf("888\n");
