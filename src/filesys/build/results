@@ -35,7 +35,7 @@ pass tests/userprog/read-zero
 pass tests/userprog/read-stdout
 pass tests/userprog/read-bad-fd
 pass tests/userprog/write-normal
-pass tests/userprog/write-bad-ptr
+FAIL tests/userprog/write-bad-ptr
 pass tests/userprog/write-boundary
 pass tests/userprog/write-zero
 pass tests/userprog/write-stdin
@@ -70,7 +70,7 @@ pass tests/filesys/base/sm-full
 pass tests/filesys/base/sm-random
 pass tests/filesys/base/sm-seq-block
 pass tests/filesys/base/sm-seq-random
-FAIL tests/filesys/base/syn-read
+pass tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 pass tests/filesys/base/syn-write
 FAIL tests/filesys/extended/dir-empty-name
