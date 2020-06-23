@@ -393,7 +393,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   get_disk_inode (inode, disk_inode);
 
   int old_length = disk_inode->length;
-  disk_inode->length = offset + size;
+  disk_inode->length = offset + size < old_length? old_length : offset + size;
   int write_end = offset + size - 1;
   if (write_end > old_length - 1)
   {
@@ -429,6 +429,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
   put_disk_inode (inode, disk_inode);
   //free (bounce);
+  free (disk_inode);
 
   return bytes_written;
 }
