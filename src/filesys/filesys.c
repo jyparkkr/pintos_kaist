@@ -131,6 +131,13 @@ do_format (void)
   free_map_create ();
   if (!dir_create (ROOT_DIR_SECTOR, 16))
     PANIC ("root directory creation failed");
+
+  struct dir *root_dir;
+  root_dir = dir_open_root ();
+  dir_add (root_dir, ".", ROOT_DIR_SECTOR);
+  dir_add (root_dir, "..", ROOT_DIR_SECTOR);
+  dir_close (root_dir);
+  
   free_map_close ();
   printf ("done.\n");
 }
@@ -172,4 +179,35 @@ struct dir* parse_path (char *path_name, char *file_name) {
   strlcpy (file_name, token, PATH_MAX_LEN);
   /* dir 정보 반환 */
   return dir;
+}
+
+/* Corresponding function with mkdir. */
+bool filesys_create_dir (const char *name)
+{
+  char* cp_name = name;
+  char dir_name[PATH_MAX_LEN + 1];
+  struct dir *dir = parse_path (cp_name, dir_name);
+
+  block_sector_t inode_sector;
+
+  bool success = (dir != NULL
+                  && free_map_allocate (1, &inode_sector)
+                  && dir_create (inode_sector, 16)
+                  && dir_add (dir, dir_name, inode_sector));
+  if (!success && inode_sector != 0) 
+    free_map_release (inode_sector, 1);
+  
+  if (!success){
+    dir_close (dir);
+    return success;
+  }
+  struct dir *opened_dir;
+  opened_dir = dir_open (inode_open (inode_sector));
+  if (!opened_dir)
+    return false;
+  dir_add (opened_dir, ".", inode_sector);
+  dir_add (opened_dir, "..", dir_get_inode (dir));
+  
+  dir_close (dir);
+  return success;
 }
