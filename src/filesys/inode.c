@@ -726,11 +726,16 @@ bool inode_is_dir (const struct inode *inode) {
   /* inode_disk 자료구조를 메모리에 할당 */
   /* in-memory inode의 on-disk inode를 읽어 inode_disk에 저장 */
   /* on-disk inode의 is_dir을 result에 저장하여 반환 */
-  struct inode_disk *inode_disk;
+  struct inode_disk *disk_inode;
+  disk_inode = (struct inode_disk *) malloc (BLOCK_SECTOR_SIZE);
+  if (disk_inode == NULL)
+    return 0;
+
   if (inode->removed)
     return false;
-  if (!get_disk_inode (inode, inode_disk))
+  if (!get_disk_inode (inode, disk_inode))
     return false;
-  result = inode_disk->is_dir;
+  result = disk_inode->is_dir;
+  free (disk_inode);
   return result;
 }

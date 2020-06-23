@@ -54,9 +54,9 @@ filesys_create (const char *name, off_t initial_size)
   char cp_name[PATH_MAX_LEN+1];
   strlcpy(cp_name,name,PATH_MAX_LEN+1);
   char file_name[PATH_MAX_LEN + 1];
-  printf("!!\n");
+  //printf("!!\n");
   struct dir *dir = parse_path(cp_name, file_name);
-  printf("!!22\n");
+  //printf("!!22\n");
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size,0)
@@ -154,10 +154,10 @@ struct dir* parse_path (char *path_name, char *file_name) {
   else
     dir = dir_reopen (thread_current ()->cur_dir);
 
-  printf("!!4\n");
+  //printf("!!4\n");
   if (!inode_is_dir (dir_get_inode (dir)))
     return NULL;
-  printf("!!5\n");
+  //printf("!!5\n");
   char *token, *nextToken, *savePtr;
   token = strtok_r (path_name, "/", &savePtr);
   nextToken = strtok_r (NULL, "/", &savePtr);
@@ -166,7 +166,7 @@ struct dir* parse_path (char *path_name, char *file_name) {
     strlcpy (file_name, ".", PATH_MAX_LEN);
     return dir;
   }
-   printf("!!3\n");
+   //printf("!!3\n");
   while (token != NULL && nextToken != NULL){
     struct inode *inode = NULL;
     /* dir에서 token이름의 파일을 검색하여 inode의 정보를 저장*/
