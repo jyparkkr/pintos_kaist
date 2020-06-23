@@ -163,10 +163,8 @@ struct dir* parse_path (char *path_name, char *file_name) {
   else
     dir = dir_reopen (thread_current ()->cur_dir);
 
-  //printf("!!4\n");
   if (!inode_is_dir (dir_get_inode (dir)))
     return NULL;
-  //printf("!!5\n");
   char *token, *nextToken, *savePtr;
   token = strtok_r (path_tok, "/", &savePtr);
   nextToken = strtok_r (NULL, "/", &savePtr);
@@ -175,33 +173,25 @@ struct dir* parse_path (char *path_name, char *file_name) {
     strlcpy (file_name, ".", PATH_MAX_LEN);
     return dir;
   }
-   //printf("!!3\n");
   while (token != NULL && nextToken != NULL){
     struct inode *inode = NULL;
-    /* dir에서 token이름의 파일을 검색하여 inode의 정보를 저장*/
     if (!dir_lookup (dir, token, &inode))
     {
       dir_close (dir);
       return NULL;
     }
-    /* inode가 파일일 경우 NULL 반환 */
     if (!inode_is_dir (inode))
     {
       dir_close (dir);
       return NULL;
     }
-    /* dir의 디렉터리 정보를 메모리에서 해지 */
     dir_close (dir);
-    /* inode의 디렉터리 정보를 dir에 저장 */
     dir = dir_open (inode);
 
-    /* token에 검색할 경로 이름 저장 */
     token = nextToken;
     nextToken = strtok_r (NULL, "/", &savePtr);
   }
-  /* token의 파일 이름을 file_name에 저장*/
   strlcpy (file_name, token, PATH_MAX_LEN);
-  /* dir 정보 반환 */
   return dir;
 }
 
