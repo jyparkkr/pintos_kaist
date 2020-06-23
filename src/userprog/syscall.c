@@ -6,11 +6,14 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
+#include "filesys/inode.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "filesys/off_t.h"
+#include "threads/thread.h"
+#include "filesys/directory.h"
 
 
 
@@ -135,8 +138,32 @@ syscall_handler (struct intr_frame *f)
     		get_argument(sp,arg,1);
     		close(arg[0]);
 			break;  
-		/*default:
-			exit(-1);*/
+		case SYS_ISDIR:
+    		get_argument(sp,arg,1);
+    		f -> eax = sys_isdir(arg[0]);
+			break;
+		case SYS_CHDIR:
+    		get_argument(sp,arg,1);
+    		check_address((void*)arg[0]);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		f -> eax = sys_chdir((const char*)arg[0]);
+			break;
+		case SYS_MKDIR:
+			get_argument(sp,arg,1);
+    		check_address((void*)arg[0]);
+    		check_address((void*)arg[0]+strlen((char*)arg[0]));
+    		f -> eax = sys_mkdir((const char*)arg[0]);
+			break;                      
+		case SYS_READDIR:
+    		get_argument(sp,arg,2);
+    		check_address((void*)arg[1]);
+    		check_address((void*)arg[1] + NAME_MAX + 1);
+    		f -> eax = sys_readdir(arg[0],(char*)arg[1]);
+			break;
+		case SYS_INUMBER:
+    		get_argument(sp,arg,1);
+    		f -> eax = sys_inumber(arg[0]);
+			break;
  	}
 }
 
@@ -258,6 +285,10 @@ int write(int fd, void *buffer, unsigned size) {
 			lock_release(&filesys_lock);
 			return -1;
 		}
+		if (inode_is_dir(file_get_inode(searching_file))){
+			lock_release(&filesys_lock);
+			return -1;
+		}
 		size_write=file_write(searching_file,(const void*)buffer,size);
 	}
 	lock_release(&filesys_lock);
@@ -278,4 +309,83 @@ unsigned tell (int fd) {
 void close (int fd) { 
 	/* close file of fd and initiallize the fd entry */ 
 	process_close_file(fd);  
-} 
+}
+
+/* check whether fd inode is directory inode */
+bool sys_isdir (int fd){
+	struct file *f;
+	f = process_get_file (fd);
+	if (f == NULL)
+		exit(-1);
+	return inode_is_dir (file_get_inode (f));
+}
+
+
+bool sys_chdir (const char *dir) {
+	/* dir 경로를 분석하여 디렉터리를 반환 */
+	/* 스레드의 현재 작업 디렉터리를 변경 */
+	char cp_dir[PATH_MAX_LEN+1];
+	strlcpy (cp_dir,dir,PATH_MAX_LEN+1);
+	strlcat (cp_dir, "/.", PATH_MAX_LEN+1);
+
+	struct dir *ch_dir, *cur_dir;
+	char dir_name [PATH_MAX_LEN + 1];
+	ch_dir = parse_path (cp_dir, dir_name);
+	cur_dir = thread_current()->cur_dir;
+
+	if (ch_dir != NULL){
+		dir_close (cur_dir);
+		thread_current()->cur_dir = ch_dir;
+		return true;
+	}
+	return false;
+}
+
+/* syscall make directory */
+bool sys_mkdir (const char *dir)
+{
+	bool success;
+	lock_acquire(&filesys_lock);
+	success = filesys_create_dir(dir);
+	lock_release(&filesys_lock);
+	return success;
+}
+
+/* syscall read directory */
+bool sys_readdir (int fd, char *name)
+{
+	lock_acquire(&filesys_lock);
+
+	struct file *f;
+	f = process_get_file (fd);
+	if (f == NULL)
+		exit(-1);
+	if(!sys_isdir(fd)){
+		lock_release(&filesys_lock);
+		return false;
+	}
+
+	struct dir *read_dir;
+	read_dir = dir_open (file_get_inode (f));
+	if (!read_dir){
+		lock_release(&filesys_lock);
+		return false;
+	}
+	if(!dir_readdir (read_dir, name)){
+		lock_release(&filesys_lock);
+		return false;
+	}
+
+	lock_release(&filesys_lock);
+	return true;
+}
+
+/* Get sector number of fd */
+int sys_inumber (int fd){
+	struct file *f;
+	f = process_get_file (fd);
+	if (f == NULL)
+		exit(-1);
+
+	return inode_get_inumber (file_get_inode (f));
+}

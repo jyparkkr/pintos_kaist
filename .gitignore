@@ -19,3 +19,7 @@
 **/*.d
 **/*.result
 **/*.o
+
+**/build
+**/build/*
+result.part3

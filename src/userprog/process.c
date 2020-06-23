@@ -250,6 +250,7 @@ process_exit (void)
   /* free fd_table */
   palloc_free_page(cur->fd_table);
 
+  dir_close (cur->cur_dir);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
