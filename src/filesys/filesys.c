@@ -146,14 +146,19 @@ do_format (void)
   printf ("done.\n");
 }
 
+/* Parse input in path_name to 
+  path to path_name
+  file to file_name. */
 struct dir* parse_path (char *path_name, char *file_name) {
   struct dir *dir = NULL;
   if (path_name == NULL || file_name == NULL)
     return NULL;
   if (strlen(path_name) == 0)
     return NULL;
-  /* PATH_NAME의 절대/상대경로에 따른 디렉터리 정보 저장(구현)*/
-  if (path_name[0] == '/')
+  /* To remain path_name */
+  char path_tok[PATH_MAX_LEN+1];
+  strlcpy (path_tok, path_name, PATH_MAX_LEN);
+  if (path_tok[0] == '/')
     dir = dir_open_root ();
   else
     dir = dir_reopen (thread_current ()->cur_dir);
@@ -163,7 +168,7 @@ struct dir* parse_path (char *path_name, char *file_name) {
     return NULL;
   //printf("!!5\n");
   char *token, *nextToken, *savePtr;
-  token = strtok_r (path_name, "/", &savePtr);
+  token = strtok_r (path_tok, "/", &savePtr);
   nextToken = strtok_r (NULL, "/", &savePtr);
   if (token == NULL)
   {
