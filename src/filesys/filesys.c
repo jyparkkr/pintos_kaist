@@ -80,7 +80,9 @@ filesys_open (const char *name)
   char cp_name[PATH_MAX_LEN+1];
   strlcpy(cp_name,name,PATH_MAX_LEN+1);
   char file_name[PATH_MAX_LEN + 1];
+  //struct dir *dir = parse_path (cp_name, file_name);
   struct dir *dir = parse_path (cp_name, file_name);
+
   struct inode *inode = NULL;
 
   if (dir != NULL)
@@ -198,7 +200,8 @@ struct dir* parse_path (char *path_name, char *file_name) {
 
 bool filesys_create_dir (const char *name)
 {
-  char *cp_name = name;
+  char cp_name[PATH_MAX_LEN+1];
+  strlcpy(cp_name,name,PATH_MAX_LEN+1);
   char dir_name[PATH_MAX_LEN + 1];
   struct dir *dir = parse_path (cp_name, dir_name);
 
@@ -215,12 +218,16 @@ bool filesys_create_dir (const char *name)
     dir_close (dir);
     return success;
   }
-  struct dir *opened_dir;
-  opened_dir = dir_open (inode_open (inode_sector));
-  if (!opened_dir)
+  struct dir *create_dir;
+  create_dir = dir_open (inode_open (inode_sector));
+  if (!create_dir){
+    dir_close (dir);
     return false;
-  dir_add (opened_dir, ".", inode_sector);
-  dir_add (opened_dir, "..", inode_get_inumber (dir_get_inode (dir)));
+  }
+  
+  dir_add (create_dir, ".", inode_sector);
+  dir_add (create_dir, "..", inode_get_inumber (dir_get_inode (dir)));
+  dir_close (create_dir);
 
   dir_close (dir);
   return success;

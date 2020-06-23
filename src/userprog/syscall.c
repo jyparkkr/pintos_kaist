@@ -285,6 +285,10 @@ int write(int fd, void *buffer, unsigned size) {
 			lock_release(&filesys_lock);
 			return -1;
 		}
+		if (inode_is_dir(file_get_inode(searching_file))){
+			lock_release(&filesys_lock);
+			return -1;
+		}
 		size_write=file_write(searching_file,(const void*)buffer,size);
 	}
 	lock_release(&filesys_lock);
@@ -320,13 +324,16 @@ bool sys_isdir (int fd){
 bool sys_chdir (const char *dir) {
 	/* dir 경로를 분석하여 디렉터리를 반환 */
 	/* 스레드의 현재 작업 디렉터리를 변경 */
-	char *cp_dir = dir;
-	char dir_name [PATH_MAX_LEN + 1];
+	char cp_dir[PATH_MAX_LEN+1];
+	strlcpy (cp_dir,dir,PATH_MAX_LEN+1);
+	strlcat (cp_dir, "/.", PATH_MAX_LEN+1);
+
 	struct dir *ch_dir, *cur_dir;
+	char dir_name [PATH_MAX_LEN + 1];
 	ch_dir = parse_path (cp_dir, dir_name);
 	cur_dir = thread_current()->cur_dir;
 
-	if (dir != NULL){
+	if (ch_dir != NULL){
 		dir_close (cur_dir);
 		thread_current()->cur_dir = ch_dir;
 		return true;
@@ -364,10 +371,8 @@ bool sys_readdir (int fd, char *name)
 		lock_release(&filesys_lock);
 		return false;
 	}
-	if (!dir_readdir (read_dir, name)){
-		lock_release(&filesys_lock);
-		return false;
-	}
+	while(!dir_readdir (read_dir, name))
+		continue;
 
 	lock_release(&filesys_lock);
 	return true;

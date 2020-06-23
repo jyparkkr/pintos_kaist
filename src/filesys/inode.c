@@ -721,6 +721,7 @@ static void free_inode_sectors (struct inode_disk *disk_inode)
   }
 }
 
+/* Check whether inode is directory */
 bool inode_is_dir (const struct inode *inode) {
   bool result;
   /* inode_disk 자료구조를 메모리에 할당 */
