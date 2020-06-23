@@ -384,12 +384,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if (inode->deny_write_cnt)
     return 0;
 
-  lock_acquire (&inode->extend_lock);
 
   struct inode_disk *disk_inode;
   disk_inode = (struct inode_disk *) malloc (BLOCK_SECTOR_SIZE);
   if (disk_inode == NULL)
     return 0;
+  lock_acquire (&inode->extend_lock);
   get_disk_inode (inode, disk_inode);
 
   int old_length = disk_inode->length;
@@ -397,8 +397,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   int write_end = offset + size - 1;
   if (write_end > old_length - 1)
   {
-    if (!inode_update_file_length (disk_inode, old_length, write_end))
+    if (!inode_update_file_length (disk_inode, old_length, write_end)){
+      lock_release (&inode->extend_lock);
       return 0;
+    }
   }
   lock_release (&inode->extend_lock);
 

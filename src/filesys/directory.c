@@ -230,13 +230,13 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
     {
       dir->pos += sizeof e;
       if (e.in_use)
+      {
+        if(strcmp (e.name, ".") && strcmp (e.name, ".."))
         {
-          if(strcmp (e.name, ".") && strcmp (e.name, ".."))
-          {
-            strlcpy (name, e.name, NAME_MAX + 1);
-            return true;
-          }
-        } 
+          strlcpy (name, e.name, NAME_MAX + 1);
+          return true;
+        }
+      } 
     }
   return false;
 }

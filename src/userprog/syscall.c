@@ -371,8 +371,10 @@ bool sys_readdir (int fd, char *name)
 		lock_release(&filesys_lock);
 		return false;
 	}
-	while(!dir_readdir (read_dir, name))
-		continue;
+	if(!dir_readdir (read_dir, name)){
+		lock_release(&filesys_lock);
+		return false;
+	}
 
 	lock_release(&filesys_lock);
 	return true;
